@@ -13,4 +13,11 @@
 - stay_eff：驻留时长 / 测试总里程
 - mobility_penalty：KPI_DT - KPI_CQT（移动惩罚）
 
+## 综合评分权重
+- 覆盖与无线质量(coverage) 权重 0.25，方向 higher
+- 体验与容量(experience) 权重 0.3，方向 higher
+- 稳定性(stability) 权重 0.2，方向 lower
+- 空间不均匀(spatial) 权重 0.15，方向 lower
+- 体验波动(volatility) 权重 0.1，方向 lower
+
 - 显著性检验可用：是

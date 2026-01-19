@@ -24,7 +24,9 @@ DATA_PATH = DATA_PATHS[0]
 
 OUT_DIR = os.path.join(BASE_DIR, 'output')
 FIG_DIR = os.path.join(OUT_DIR, 'figures')
+DERIVED_FIG_DIR = os.path.join(FIG_DIR, 'derived')
 os.makedirs(FIG_DIR, exist_ok=True)
+os.makedirs(DERIVED_FIG_DIR, exist_ok=True)
 
 SCENE2_MAP = {
     '停车场': '停车场',
@@ -62,6 +64,38 @@ METRIC_NOTES = [
     'availability：RedCap 驻留比 * 5G覆盖率（优先覆盖率3/4）',
     'stay_eff：驻留时长 / 测试总里程',
     'mobility_penalty：KPI_DT - KPI_CQT（移动惩罚）',
+]
+COMPOSITE_GROUPS = [
+    {
+        'name': 'coverage',
+        'label': '覆盖与无线质量',
+        'weight': 0.25,
+        'direction': 'higher',
+    },
+    {
+        'name': 'experience',
+        'label': '体验与容量',
+        'weight': 0.30,
+        'direction': 'higher',
+    },
+    {
+        'name': 'stability',
+        'label': '稳定性',
+        'weight': 0.20,
+        'direction': 'lower',
+    },
+    {
+        'name': 'spatial',
+        'label': '空间不均匀',
+        'weight': 0.15,
+        'direction': 'lower',
+    },
+    {
+        'name': 'volatility',
+        'label': '体验波动',
+        'weight': 0.10,
+        'direction': 'lower',
+    },
 ]
 
 matplotlib.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS']
@@ -135,6 +169,10 @@ def metric_label(col):
         return '下载掉线强度(次/小时)'
     if col == 'ul_drops_per_hour':
         return '上传掉线强度(次/小时)'
+    if col == 'dl_drops_per_km':
+        return '下载掉线强度(次/公里)'
+    if col == 'ul_drops_per_km':
+        return '上传掉线强度(次/公里)'
     if col == 'abs_delta_rsrp':
         return 'RSRP空间不均匀度'
     if col == 'abs_delta_cov2':
@@ -277,6 +315,76 @@ def composite_scores(df, group_col, metric_cols):
     return normed.reset_index()
 
 
+def composite_scores_weighted(df, group_col, group_specs):
+    all_metrics = []
+    for spec in group_specs:
+        all_metrics.extend(spec['metrics'])
+    all_metrics = [m for m in all_metrics if m in df.columns]
+    if not all_metrics:
+        return pd.DataFrame()
+    grouped = df.groupby(group_col)[all_metrics].mean()
+    if grouped.empty:
+        return pd.DataFrame()
+
+    normed = grouped.copy()
+    for col in all_metrics:
+        normed[col] = minmax_norm(grouped[col])
+
+    result = pd.DataFrame(index=grouped.index)
+    used_specs = []
+    for spec in group_specs:
+        metrics = [m for m in spec['metrics'] if m in normed.columns]
+        if not metrics:
+            continue
+        score = normed[metrics].mean(axis=1, skipna=True)
+        if spec['direction'] == 'lower':
+            score = 1 - score
+        result[f'{spec["name"]}_score'] = score
+        used_specs.append(spec)
+
+    if not used_specs:
+        return pd.DataFrame()
+
+    total_weight = sum(spec['weight'] for spec in used_specs)
+    weighted = 0
+    for spec in used_specs:
+        weighted += result[f'{spec["name"]}_score'] * (spec['weight'] / total_weight)
+    result['composite_weighted'] = weighted
+    return result.reset_index()
+
+
+def build_composite_specs(rsrp, sinr, cov1, dl, ul, df):
+    coverage_metrics = [m for m in [rsrp, sinr, cov1] if m]
+
+    experience_metrics = [m for m in ['effective_dl', 'effective_ul'] if m in df.columns]
+    if not experience_metrics:
+        experience_metrics = [m for m in [dl, ul] if m]
+
+    stability_metrics = [m for m in ['dl_drops_per_hour', 'ul_drops_per_hour'] if m in df.columns]
+    spatial_metrics = [m for m in ['abs_delta_rsrp', 'abs_delta_cov2'] if m in df.columns]
+    volatility_metrics = [m for m in ['dl_tail_drag', 'ul_tail_drag'] if m in df.columns]
+
+    specs = []
+    for spec in COMPOSITE_GROUPS:
+        if spec['name'] == 'coverage':
+            metrics = coverage_metrics
+        elif spec['name'] == 'experience':
+            metrics = experience_metrics
+        elif spec['name'] == 'stability':
+            metrics = stability_metrics
+        elif spec['name'] == 'spatial':
+            metrics = spatial_metrics
+        elif spec['name'] == 'volatility':
+            metrics = volatility_metrics
+        else:
+            metrics = []
+        if metrics:
+            spec = dict(spec)
+            spec['metrics'] = metrics
+            specs.append(spec)
+    return specs
+
+
 def pairwise_ttests(df, group_col, metric_cols):
     if not HAS_SCIPY:
         return pd.DataFrame()
@@ -409,6 +517,19 @@ def mobility_penalty(df, group_cols, metric_cols):
             row[f'{col}_n_cqt'] = int(cqt[col].notna().sum())
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+def penalty_columns(group_cols, metric_cols):
+    cols = list(group_cols)
+    for col in metric_cols:
+        cols.extend([
+            f'{col}_dt_mean',
+            f'{col}_cqt_mean',
+            f'{col}_penalty',
+            f'{col}_n_dt',
+            f'{col}_n_cqt',
+        ])
+    return cols
 
 
 def plot_city_operator_bar(df, metric_col, out_path, title):
@@ -550,6 +671,10 @@ with open(notes_path, 'w', encoding='utf-8-sig') as f:
     for line in METRIC_NOTES:
         f.write(f'- {line}\n')
     f.write('\n')
+    f.write('## 综合评分权重\n')
+    for spec in COMPOSITE_GROUPS:
+        f.write(f'- {spec["label"]}({spec["name"]}) 权重 {spec["weight"]}，方向 {spec["direction"]}\n')
+    f.write('\n')
     f.write(f'- 显著性检验可用：{("是" if HAS_SCIPY else "否")}\n')
 
 for sheet in xl.sheet_names:
@@ -567,7 +692,7 @@ for sheet in xl.sheet_names:
     test_metrics = base_metrics + [c for c in ['effective_dl', 'effective_ul'] if c in df.columns]
     summary_metrics = base_metrics + [c for c in [
         'effective_dl', 'effective_ul', 'dl_drops_per_hour', 'ul_drops_per_hour',
-        'abs_delta_rsrp', 'abs_delta_cov2', 'availability'
+        'abs_delta_rsrp', 'abs_delta_cov2', 'availability', 'dl_drops_per_km', 'ul_drops_per_km'
     ] if c in df.columns]
 
     weight_col = choose_weight_col(df)
@@ -586,6 +711,32 @@ for sheet in xl.sheet_names:
             radar_labels.append(metric_label(col))
 
     plot_operator_radar(df, radar_metrics, radar_labels, os.path.join(FIG_DIR, f'{sheet}_operator_radar.png'), f'{sheet} 运营商雷达图（归一化）')
+
+    derived_plot_metrics = [
+        col for col in [
+            'effective_dl', 'effective_ul', 'dl_drops_per_hour', 'ul_drops_per_hour',
+            'abs_delta_rsrp', 'abs_delta_cov2', 'availability', 'dl_tail_drag', 'ul_tail_drag'
+        ] if col in df.columns
+    ]
+    for metric in derived_plot_metrics:
+        plot_city_operator_bar(
+            df,
+            metric,
+            os.path.join(DERIVED_FIG_DIR, f'{sheet}_derived_{metric}_city_operator_bar.png'),
+            f'{sheet} 派生指标城市-运营商对比'
+        )
+        plot_scene1_operator_bar(
+            df,
+            metric,
+            os.path.join(DERIVED_FIG_DIR, f'{sheet}_derived_{metric}_scene1_operator_bar.png'),
+            f'{sheet} 派生指标一级场景对比'
+        )
+        plot_scene_trend(
+            df,
+            metric,
+            os.path.join(DERIVED_FIG_DIR, f'{sheet}_derived_{metric}_scene_trend.png'),
+            f'{sheet} 派生指标场景趋势'
+        )
 
     # Aggregated tables
     df.groupby(['city', 'operator']).mean(numeric_only=True).to_csv(
@@ -620,6 +771,12 @@ for sheet in xl.sheet_names:
     if not comp_df.empty:
         comp_df.to_csv(os.path.join(OUT_DIR, f'{sheet}_operator_composite.csv'), index=False, encoding='utf-8-sig')
 
+    # Composite scores (weighted)
+    composite_specs = build_composite_specs(rsrp, sinr, cov1, dl, ul, df)
+    comp_weight_df = composite_scores_weighted(df, 'operator', composite_specs)
+    if not comp_weight_df.empty:
+        comp_weight_df.to_csv(os.path.join(OUT_DIR, f'{sheet}_operator_composite_weighted.csv'), index=False, encoding='utf-8-sig')
+
     # Significance tests
     ttest_df = pairwise_ttests(df, 'operator', test_metrics)
     if not ttest_df.empty:
@@ -631,11 +788,50 @@ for sheet in xl.sheet_names:
     if not mobility_df.empty:
         mobility_df.to_csv(os.path.join(OUT_DIR, f'{sheet}_mobility_penalty.csv'), index=False, encoding='utf-8-sig')
 
+    # Mobility penalty (operator + city + scene_l2) + ranking
+    mobility_detail = pd.DataFrame()
+    mobility_detail = mobility_penalty(df, ['operator', 'city', 'scene_l2'], penalty_metrics)
+    detail_cols = penalty_columns(['operator', 'city', 'scene_l2'], penalty_metrics)
+    if mobility_detail.empty:
+        pd.DataFrame(columns=detail_cols).to_csv(
+            os.path.join(OUT_DIR, f'{sheet}_mobility_penalty_detail.csv'),
+            index=False,
+            encoding='utf-8-sig',
+        )
+        pd.DataFrame(columns=['operator', 'city', 'scene_l2', 'penalty', 'rank', 'rank_in_operator']).to_csv(
+            os.path.join(OUT_DIR, f'{sheet}_mobility_penalty_rank.csv'),
+            index=False,
+            encoding='utf-8-sig',
+        )
+    else:
+        mobility_detail.to_csv(os.path.join(OUT_DIR, f'{sheet}_mobility_penalty_detail.csv'), index=False, encoding='utf-8-sig')
+        penalty_metric = None
+        for candidate in ['effective_dl', dl, rsrp]:
+            if candidate and f'{candidate}_penalty' in mobility_detail.columns:
+                penalty_metric = candidate
+                break
+        if penalty_metric:
+            pcol = f'{penalty_metric}_penalty'
+            rank_df = mobility_detail[['operator', 'city', 'scene_l2', pcol]].dropna().copy()
+            if not rank_df.empty:
+                rank_df = rank_df.sort_values(pcol, ascending=True)
+                rank_df['rank'] = np.arange(1, rank_df.shape[0] + 1)
+                rank_df['rank_in_operator'] = rank_df.groupby('operator')[pcol].rank(method='first')
+                rank_df = rank_df.rename(columns={pcol: 'penalty'})
+                rank_df.to_csv(os.path.join(OUT_DIR, f'{sheet}_mobility_penalty_rank.csv'), index=False, encoding='utf-8-sig')
+            else:
+                pd.DataFrame(columns=['operator', 'city', 'scene_l2', 'penalty', 'rank', 'rank_in_operator']).to_csv(
+                    os.path.join(OUT_DIR, f'{sheet}_mobility_penalty_rank.csv'),
+                    index=False,
+                    encoding='utf-8-sig',
+                )
+
     # Summary
     summary_lines.append(f'## {sheet}')
     summary_lines.append(f'- 数据量：{df.shape[0]} 行，字段 {df.shape[1]} 列')
     summary_lines.append('- 缺失值处理：不做填补，统计按有效样本计算')
     summary_lines.append(f'- 一级场景输出：{sheet}_scene1_operator_mean.csv、{sheet}_scene1_operator_bar.png')
+    summary_lines.append('- 派生指标图表输出：output/figures/derived/')
 
     missing_items = []
     for col, valid, miss_rate in missing_summary(df, summary_metrics):
@@ -714,7 +910,12 @@ for sheet in xl.sheet_names:
     if not comp_df.empty:
         comp_sorted = comp_df.sort_values('composite_score', ascending=False)
         best = comp_sorted.iloc[0]
-        summary_lines.append(f'- 综合评分最优运营商：{best["operator"]}（{best["composite_score"]:.3f}）')
+        summary_lines.append(f'- 综合评分(等权)最优运营商：{best["operator"]}（{best["composite_score"]:.3f}）')
+
+    if not comp_weight_df.empty:
+        comp_sorted = comp_weight_df.sort_values('composite_weighted', ascending=False)
+        best = comp_sorted.iloc[0]
+        summary_lines.append(f'- 综合评分(加权)最优运营商：{best["operator"]}（{best["composite_weighted"]:.3f}）')
 
     if not mobility_df.empty:
         penalty_metric = None
@@ -729,6 +930,21 @@ for sheet in xl.sheet_names:
                 worst = subset.loc[subset[pcol].idxmin()]
                 summary_lines.append(
                     f'- DT相对CQT移动惩罚（{metric_label(penalty_metric)}）：{worst["operator"]}（{worst[pcol]:.3f}）'
+                )
+
+    if not mobility_detail.empty:
+        penalty_metric = None
+        for candidate in ['effective_dl', dl, rsrp]:
+            if candidate and f'{candidate}_penalty' in mobility_detail.columns:
+                penalty_metric = candidate
+                break
+        if penalty_metric:
+            pcol = f'{penalty_metric}_penalty'
+            ranked = mobility_detail[['operator', 'city', 'scene_l2', pcol]].dropna()
+            if not ranked.empty:
+                worst = ranked.loc[ranked[pcol].idxmin()]
+                summary_lines.append(
+                    f'- 移动惩罚最重点位（{metric_label(penalty_metric)}）：{worst["operator"]} {worst["city"]}-{worst["scene_l2"]}（{worst[pcol]:.3f}）'
                 )
 
     if not ttest_df.empty:
