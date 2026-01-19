@@ -1,4 +1,4 @@
-import os
+﻿import os
 import glob
 import math
 import numpy as np
@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
 try:
     from scipy import stats
     HAS_SCIPY = True
@@ -23,32 +24,32 @@ FIG_DIR = os.path.join(OUT_DIR, 'figures')
 os.makedirs(FIG_DIR, exist_ok=True)
 
 SCENE2_MAP = {
-    '\u505c\u8f66\u573a': '\u505c\u8f66\u573a',
-    '\u8865\u7ed9\u7ad9': '\u8865\u7ed9\u7ad9',
-    '\u6b65\u884c\u9053': '\u6b65\u884c\u9053',
-    '\u9a91\u884c\u9053': '\u9a91\u884c\u9053',
-    '\u5496\u5561\u5385': '\u5496\u5561\u5385',
-    '\u57ce\u5e02\u9053\u8def': '\u57ce\u5e02\u9053\u8def',
-    '\u4f11\u606f\u70b9': '\u4f11\u606f\u70b9',
+    '停车场': '停车场',
+    '补给站': '补给站',
+    '步行道': '步行道',
+    '骑行道': '骑行道',
+    '咖啡厅': '咖啡厅',
+    '城市道路': '城市道路',
+    '休息点': '休息点',
 }
 
 SCENE1_MAP = {
-    'DT': '\u9a71\u6d4b',
-    'CQT': '\u5b9a\u70b9',
+    'DT': '驶测',
+    'CQT': '定点',
 }
 
 OP_MAP = {
-    1: '\u79fb\u52a8',
-    2: '\u7535\u4fe1',
-    3: '\u8054\u901a',
+    1: '移动',
+    2: '电信',
+    3: '联通',
 }
 
-COVER_TOKEN = '\u8986\u76d6\u73871'
+COVER_TOKEN = '覆盖率1'
 METRIC_NOTES = [
-    '\u8986\u76d6\u73871\uff1a\u6ee1\u8db3(RSRP >= -105dBm \u4e14 SINR >= -3)\u7684\u91c7\u6837\u70b9\u5360\u6bd4',
-    '\u4e0b\u884c\u901f\u7387\u8fbe\u6807\u7387\uff1a\u5e94\u7528\u5c42\u4e0b\u884c\u901f\u7387 >= 2Mbps \u7684\u5360\u6bd4',
-    '\u4e0a\u884c\u901f\u7387\u8fbe\u6807\u7387\uff1a\u5e94\u7528\u5c42\u4e0a\u884c\u901f\u7387 >= 0.5Mbps \u7684\u5360\u6bd4',
-    '\u5355\u4f4d\uff1a\u541e\u5410\u7387\u4e3a Mbps\uff0c\u6d4b\u8bd5\u603b\u91cc\u7a0b\u4e3a KM\uff0c\u603b\u65f6\u957f\u4e3a h',
+    '覆盖率1：满足(RSRP >= -105dBm 且 SINR >= -3)的采样点占比',
+    '下行速率达标率：应用层下行速率 >= 2Mbps 的占比',
+    '上行速率达标率：应用层上行速率 >= 0.5Mbps 的占比',
+    '单位：吞吐率为 Mbps，测试总里程为 KM，总时长为 h',
 ]
 
 matplotlib.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS']
@@ -75,20 +76,15 @@ def rename_base_cols(df):
 def clean_df(df):
     df = rename_base_cols(df)
 
-    # Normalize category columns
     for col in ['vendor', 'city', 'scene_l1', 'scene_l2', 'operator']:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip()
             df.loc[df[col].isin(['nan', 'None', 'NaT']), col] = np.nan
 
-    # Map operator codes
     df['operator'] = pd.to_numeric(df['operator'], errors='coerce').map(OP_MAP).fillna(df['operator'])
-
-    # Map scenes
     df['scene_l1'] = df['scene_l1'].map(SCENE1_MAP).fillna(df['scene_l1'])
     df['scene_l2'] = df['scene_l2'].map(SCENE2_MAP).fillna(df['scene_l2'])
 
-    # Numeric conversion for non-category columns
     for col in df.columns:
         if col in ['vendor', 'city', 'scene_l1', 'scene_l2', 'operator']:
             continue
@@ -114,12 +110,12 @@ def metric_label(col):
     if 'SINR' in col:
         return 'SINR'
     if col.startswith('y1_'):
-        return '\u4e0b\u884c\u541e\u5410\u7387'
+        return '下行吞吐率'
     if col.startswith('z1_'):
-        return '\u4e0a\u884c\u541e\u5410\u7387'
+        return '上行吞吐率'
     if COVER_TOKEN in col:
-        return '\u8986\u76d6\u73871'
-    return '\u6307\u6807'
+        return '覆盖率1'
+    return '指标'
 
 
 def minmax_norm(series):
@@ -261,9 +257,9 @@ def plot_city_operator_bar(df, metric_col, out_path, title):
     ax = pivot.plot(kind='bar', figsize=(10, 5))
     label = metric_label(metric_col)
     ax.set_title(f'{title}（{label}）' if label else title)
-    ax.set_xlabel('\u57ce\u5e02')
-    ax.set_ylabel(label or '\u6307\u6807')
-    ax.legend(title='\u8fd0\u8425\u5546')
+    ax.set_xlabel('城市')
+    ax.set_ylabel(label or '指标')
+    ax.legend(title='运营商')
     plt.tight_layout()
     plt.savefig(out_path, dpi=150)
     plt.close()
@@ -283,10 +279,10 @@ def plot_scene_trend(df, metric_col, out_path, title):
         ax.plot(order, sub[metric_col], marker='o', label=str(op))
     label = metric_label(metric_col)
     ax.set_title(f'{title}（{label}）' if label else title)
-    ax.set_xlabel('\u4e8c\u7ea7\u573a\u666f')
-    ax.set_ylabel(label or '\u6307\u6807')
+    ax.set_xlabel('二级场景')
+    ax.set_ylabel(label or '指标')
     ax.tick_params(axis='x', rotation=45, labelsize=8)
-    ax.legend(title='\u8fd0\u8425\u5546')
+    ax.legend(title='运营商')
     plt.tight_layout()
     plt.savefig(out_path, dpi=150)
     plt.close()
@@ -303,13 +299,32 @@ def plot_city_operator_heatmap(df, metric_col, out_path, title):
     im = ax.imshow(pivot.values, aspect='auto', cmap='viridis')
     label = metric_label(metric_col)
     ax.set_title(f'{title}（{label}）' if label else title)
-    ax.set_xlabel('\u8fd0\u8425\u5546')
-    ax.set_ylabel('\u57ce\u5e02')
+    ax.set_xlabel('运营商')
+    ax.set_ylabel('城市')
     ax.set_xticks(range(len(pivot.columns)))
     ax.set_xticklabels(pivot.columns)
     ax.set_yticks(range(len(pivot.index)))
     ax.set_yticklabels(pivot.index)
     fig.colorbar(im, ax=ax, shrink=0.8)
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=150)
+    plt.close()
+    return True
+
+
+def plot_scene1_operator_bar(df, metric_col, out_path, title):
+    if not metric_col:
+        return False
+    data = df.groupby(['scene_l1', 'operator'])[metric_col].mean().reset_index()
+    if data.empty:
+        return False
+    pivot = data.pivot(index='scene_l1', columns='operator', values=metric_col)
+    ax = pivot.plot(kind='bar', figsize=(8, 4))
+    label = metric_label(metric_col)
+    ax.set_title(f'{title}（{label}）' if label else title)
+    ax.set_xlabel('一级场景')
+    ax.set_ylabel(label or '指标')
+    ax.legend(title='运营商')
     plt.tight_layout()
     plt.savefig(out_path, dpi=150)
     plt.close()
@@ -342,7 +357,7 @@ def plot_operator_radar(df, metric_cols, labels, out_path, title):
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(labels)
     ax.set_yticklabels([])
-    ax.legend(loc='upper right', bbox_to_anchor=(1.2, 1.1), title='\u8fd0\u8425\u5546')
+    ax.legend(loc='upper right', bbox_to_anchor=(1.2, 1.1), title='运营商')
     plt.tight_layout()
     plt.savefig(out_path, dpi=150)
     plt.close()
@@ -365,6 +380,14 @@ def top_entity(df, group_col, metric_col, mode='max'):
 xl = pd.ExcelFile(DATA_PATH)
 summary_lines = []
 
+notes_path = os.path.join(OUT_DIR, 'metrics_notes.md')
+with open(notes_path, 'w', encoding='utf-8-sig') as f:
+    f.write('# 指标与阈值说明\n')
+    for line in METRIC_NOTES:
+        f.write(f'- {line}\n')
+    f.write('\n')
+    f.write(f'- 显著性检验可用：{("是" if HAS_SCIPY else "否")}\n')
+
 for sheet in xl.sheet_names:
     raw = xl.parse(sheet)
     df = clean_df(raw)
@@ -373,31 +396,24 @@ for sheet in xl.sheet_names:
     df.to_csv(out_clean, index=False, encoding='utf-8-sig')
 
     rsrp, sinr, cov1, dl, ul = pick_metrics(df)
+    metrics = [m for m in [rsrp, sinr, cov1, dl, ul] if m]
+
+    weight_col = choose_weight_col(df)
 
     # Charts
-    plot_city_operator_bar(df, rsrp, os.path.join(FIG_DIR, f'{sheet}_city_operator_bar.png'), f'{sheet} \u57ce\u5e02-\u8fd0\u8425\u5546\u5bf9\u6bd4\u67f1\u72b6\u56fe')
-    plot_scene_trend(df, dl or rsrp, os.path.join(FIG_DIR, f'{sheet}_scene_trend.png'), f'{sheet} \u573a\u666f\u8d8b\u52bf\u56fe')
-    plot_city_operator_heatmap(df, sinr, os.path.join(FIG_DIR, f'{sheet}_city_operator_heatmap.png'), f'{sheet} \u57ce\u5e02-\u8fd0\u8425\u5546\u70ed\u529b\u56fe')
+    plot_city_operator_bar(df, rsrp, os.path.join(FIG_DIR, f'{sheet}_city_operator_bar.png'), f'{sheet} 城市-运营商对比柱状图')
+    plot_scene_trend(df, dl or rsrp, os.path.join(FIG_DIR, f'{sheet}_scene_trend.png'), f'{sheet} 场景趋势图')
+    plot_city_operator_heatmap(df, sinr, os.path.join(FIG_DIR, f'{sheet}_city_operator_heatmap.png'), f'{sheet} 城市-运营商热力图')
+    plot_scene1_operator_bar(df, dl or rsrp, os.path.join(FIG_DIR, f'{sheet}_scene1_operator_bar.png'), f'{sheet} 一级场景对比')
 
     radar_metrics = []
     radar_labels = []
-    if rsrp:
-        radar_metrics.append(rsrp)
-        radar_labels.append('RSRP')
-    if sinr:
-        radar_metrics.append(sinr)
-        radar_labels.append('SINR')
-    if dl:
-        radar_metrics.append(dl)
-        radar_labels.append('DL Throughput')
-    if ul:
-        radar_metrics.append(ul)
-        radar_labels.append('UL Throughput')
-    if cov1:
-        radar_metrics.append(cov1)
-        radar_labels.append('Coverage')
+    for col in [rsrp, sinr, dl, ul, cov1]:
+        if col:
+            radar_metrics.append(col)
+            radar_labels.append(metric_label(col))
 
-    plot_operator_radar(df, radar_metrics, radar_labels, os.path.join(FIG_DIR, f'{sheet}_operator_radar.png'), f'{sheet} \u8fd0\u8425\u5546\u96f7\u8fbe\u56fe\uff08\u5f52\u4e00\u5316\uff09')
+    plot_operator_radar(df, radar_metrics, radar_labels, os.path.join(FIG_DIR, f'{sheet}_operator_radar.png'), f'{sheet} 运营商雷达图（归一化）')
 
     # Aggregated tables
     df.groupby(['city', 'operator']).mean(numeric_only=True).to_csv(
@@ -408,35 +424,98 @@ for sheet in xl.sheet_names:
         os.path.join(OUT_DIR, f'{sheet}_scene_operator_mean.csv'),
         encoding='utf-8-sig',
     )
+    df.groupby(['scene_l1', 'operator']).mean(numeric_only=True).to_csv(
+        os.path.join(OUT_DIR, f'{sheet}_scene1_operator_mean.csv'),
+        encoding='utf-8-sig',
+    )
     df.groupby(['operator']).mean(numeric_only=True).to_csv(
         os.path.join(OUT_DIR, f'{sheet}_operator_mean.csv'),
         encoding='utf-8-sig',
     )
 
+    # Weighted means
+    weighted_df = weighted_group_mean(df, ['operator'], metrics, weight_col)
+    if not weighted_df.empty:
+        weighted_df.to_csv(os.path.join(OUT_DIR, f'{sheet}_operator_weighted.csv'), index=False, encoding='utf-8-sig')
+
+    # Robust stats
+    robust_df = robust_group_stats(df, 'operator', metrics)
+    if not robust_df.empty:
+        robust_df.to_csv(os.path.join(OUT_DIR, f'{sheet}_operator_robust.csv'), index=False, encoding='utf-8-sig')
+
+    # Composite scores
+    comp_df = composite_scores(df, 'operator', metrics)
+    if not comp_df.empty:
+        comp_df.to_csv(os.path.join(OUT_DIR, f'{sheet}_operator_composite.csv'), index=False, encoding='utf-8-sig')
+
+    # Significance tests
+    ttest_df = pairwise_ttests(df, 'operator', metrics)
+    if not ttest_df.empty:
+        ttest_df.to_csv(os.path.join(OUT_DIR, f'{sheet}_significance.csv'), index=False, encoding='utf-8-sig')
+
     # Summary
     summary_lines.append(f'## {sheet}')
+    summary_lines.append(f'- 数据量：{df.shape[0]} 行，字段 {df.shape[1]} 列')
+    summary_lines.append('- 缺失值处理：不做填补，统计按有效样本计算')
+    summary_lines.append(f'- 一级场景输出：{sheet}_scene1_operator_mean.csv、{sheet}_scene1_operator_bar.png')
+
+    missing_items = []
+    for col, valid, miss_rate in missing_summary(df, metrics):
+        missing_items.append(f'{metric_label(col)} {miss_rate * 100:.1f}% (n={valid})')
+    if missing_items:
+        summary_lines.append(f'- 关键指标缺失率：' + '，'.join(missing_items))
+
     if rsrp:
         top_op = top_entity(df, 'operator', rsrp, 'max')
         top_city = top_entity(df, 'city', rsrp, 'max')
         if top_op:
-            summary_lines.append(f'- RSRP\u6700\u4f18\u8fd0\u8425\u5546\uff1a{top_op[0]}\uff08{top_op[1]:.3f}\uff09')
+            summary_lines.append(f'- RSRP最优运营商：{top_op[0]}（{top_op[1]:.3f}）')
         if top_city:
-            summary_lines.append(f'- RSRP\u6700\u4f18\u57ce\u5e02\uff1a{top_city[0]}\uff08{top_city[1]:.3f}\uff09')
+            summary_lines.append(f'- RSRP最优城市：{top_city[0]}（{top_city[1]:.3f}）')
     if sinr:
         top_op = top_entity(df, 'operator', sinr, 'max')
         top_city = top_entity(df, 'city', sinr, 'max')
         if top_op:
-            summary_lines.append(f'- SINR\u6700\u4f18\u8fd0\u8425\u5546\uff1a{top_op[0]}\uff08{top_op[1]:.3f}\uff09')
+            summary_lines.append(f'- SINR最优运营商：{top_op[0]}（{top_op[1]:.3f}）')
         if top_city:
-            summary_lines.append(f'- SINR\u6700\u4f18\u57ce\u5e02\uff1a{top_city[0]}\uff08{top_city[1]:.3f}\uff09')
+            summary_lines.append(f'- SINR最优城市：{top_city[0]}（{top_city[1]:.3f}）')
     if dl:
         top_op = top_entity(df, 'operator', dl, 'max')
         if top_op:
-            summary_lines.append(f'- \u4e0b\u884c\u541e\u5410\u7387\u6700\u4f18\u8fd0\u8425\u5546\uff1a{top_op[0]}\uff08{top_op[1]:.3f}\uff09')
+            summary_lines.append(f'- 下行吞吐率最优运营商：{top_op[0]}（{top_op[1]:.3f}）')
     if ul:
         top_op = top_entity(df, 'operator', ul, 'max')
         if top_op:
-            summary_lines.append(f'- \u4e0a\u884c\u541e\u5410\u7387\u6700\u4f18\u8fd0\u8425\u5546\uff1a{top_op[0]}\uff08{top_op[1]:.3f}\uff09')
+            summary_lines.append(f'- 上行吞吐率最优运营商：{top_op[0]}（{top_op[1]:.3f}）')
+
+    if weight_col and not weighted_df.empty and rsrp:
+        w_col = f'{rsrp}_wmean'
+        if w_col in weighted_df.columns:
+            top_w = weighted_df.set_index('operator')[w_col].dropna()
+            if not top_w.empty:
+                best = top_w.idxmax()
+                summary_lines.append(f'- 加权口径：{weight_col}，RSRP加权最优运营商：{best}（{top_w.loc[best]:.3f}）')
+
+    if not robust_df.empty and rsrp:
+        r_col = f'{rsrp}_winsor_mean'
+        if r_col in robust_df.columns:
+            top_r = robust_df.set_index('operator')[r_col].dropna()
+            if not top_r.empty:
+                best = top_r.idxmax()
+                summary_lines.append(f'- IQR稳健均值(RSRP)最优运营商：{best}（{top_r.loc[best]:.3f}）')
+
+    if not comp_df.empty:
+        comp_sorted = comp_df.sort_values('composite_score', ascending=False)
+        best = comp_sorted.iloc[0]
+        summary_lines.append(f'- 综合评分最优运营商：{best["operator"]}（{best["composite_score"]:.3f}）')
+
+    if not ttest_df.empty:
+        sig = ttest_df.loc[ttest_df['p_value'] < 0.05]
+        summary_lines.append(f'- 显著性检验结果：显著差异 {sig.shape[0]} 条（详见 {sheet}_significance.csv）')
+    elif HAS_SCIPY:
+        summary_lines.append('- 显著性检验结果：无满足样本条件的可检验项')
+    else:
+        summary_lines.append('- 显著性检验结果：未安装 SciPy，已跳过')
 
 summary_path = os.path.join(OUT_DIR, 'summary.md')
 with open(summary_path, 'w', encoding='utf-8-sig') as f:
