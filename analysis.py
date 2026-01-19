@@ -14,7 +14,10 @@ except Exception:
     HAS_SCIPY = False
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DATA_PATHS = glob.glob(os.path.join(BASE_DIR, '*.xlsx'))
+DATA_PATHS = [
+    p for p in glob.glob(os.path.join(BASE_DIR, '*.xlsx'))
+    if not os.path.basename(p).startswith('~$')
+]
 if not DATA_PATHS:
     raise SystemExit('No .xlsx file found in working directory')
 DATA_PATH = DATA_PATHS[0]
@@ -50,6 +53,15 @@ METRIC_NOTES = [
     '下行速率达标率：应用层下行速率 >= 2Mbps 的占比',
     '上行速率达标率：应用层上行速率 >= 0.5Mbps 的占比',
     '单位：吞吐率为 Mbps，测试总里程为 KM，总时长为 h',
+    'delta_rsrp：x1_avg_rsrp - x2_avg_rsrp（空间不均匀）',
+    'delta_cov2：x1_cov2 - x2_cov2（空间不均匀）',
+    'effective_dl/ul：平均吞吐率 * (1 - 掉线率)',
+    'dl/ul_tail_drag：前10%峰值 - 平均吞吐率（尾部拖累）',
+    'dl/ul_drops_per_hour：掉线次数 / 测试总时长',
+    'dl/ul_drops_per_km：掉线次数 / 测试总里程',
+    'availability：RedCap 驻留比 * 5G覆盖率（优先覆盖率3/4）',
+    'stay_eff：驻留时长 / 测试总里程',
+    'mobility_penalty：KPI_DT - KPI_CQT（移动惩罚）',
 ]
 
 matplotlib.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS']
@@ -115,7 +127,52 @@ def metric_label(col):
         return '上行吞吐率'
     if COVER_TOKEN in col:
         return '覆盖率1'
+    if col == 'effective_dl':
+        return '有效下行吞吐率'
+    if col == 'effective_ul':
+        return '有效上行吞吐率'
+    if col == 'dl_drops_per_hour':
+        return '下载掉线强度(次/小时)'
+    if col == 'ul_drops_per_hour':
+        return '上传掉线强度(次/小时)'
+    if col == 'abs_delta_rsrp':
+        return 'RSRP空间不均匀度'
+    if col == 'abs_delta_cov2':
+        return '覆盖率2空间不均匀度'
+    if col == 'availability':
+        return '5G可用性'
+    if col == 'dl_tail_drag':
+        return '下行尾部拖累'
+    if col == 'ul_tail_drag':
+        return '上行尾部拖累'
     return '指标'
+
+
+def find_col(df, prefix=None, contains=None, contains_any=None):
+    for col in df.columns:
+        if prefix and not col.startswith(prefix):
+            continue
+        if contains and any(token not in col for token in contains):
+            continue
+        if contains_any and not any(token in col for token in contains_any):
+            continue
+        return col
+    return None
+
+
+def safe_divide(numer, denom):
+    result = numer / denom
+    return result.replace([np.inf, -np.inf], np.nan)
+
+
+def calc_drop_rate(df, count_col, attempt_col, rate_col):
+    if count_col and attempt_col:
+        rate = safe_divide(df[count_col], df[attempt_col])
+    elif rate_col:
+        rate = df[rate_col]
+    else:
+        return None
+    return rate.clip(lower=0, upper=1)
 
 
 def minmax_norm(series):
@@ -245,6 +302,113 @@ def pairwise_ttests(df, group_col, metric_cols):
                     'p_value': float(p_val),
                 })
     return pd.DataFrame(results)
+
+
+def compute_derived_metrics(df):
+    derived = []
+
+    x1_rsrp = find_col(df, prefix='x1_', contains_any=['RSRP'])
+    x2_rsrp = find_col(df, prefix='x2_', contains_any=['RSRP'])
+    if x1_rsrp and x2_rsrp:
+        df['delta_rsrp'] = df[x1_rsrp] - df[x2_rsrp]
+        df['abs_delta_rsrp'] = df['delta_rsrp'].abs()
+        derived.extend(['delta_rsrp', 'abs_delta_rsrp'])
+
+    x1_cov2 = find_col(df, prefix='x1_', contains=['覆盖率2'])
+    x2_cov2 = find_col(df, prefix='x2_', contains=['覆盖率2'])
+    if x1_cov2 and x2_cov2:
+        df['delta_cov2'] = df[x1_cov2] - df[x2_cov2]
+        df['abs_delta_cov2'] = df['delta_cov2'].abs()
+        derived.extend(['delta_cov2', 'abs_delta_cov2'])
+
+    avg_dl = find_col(df, prefix='y1_', contains=['应用层下行平均吞吐率'])
+    peak_dl = find_col(df, prefix='y1_', contains=['下行前10%峰值速率'])
+    dl_drop_rate_col = find_col(df, prefix='y1_', contains=['FTP下载掉线率'])
+    dl_drop_count = find_col(df, prefix='y1_', contains=['FTP下载掉线次数'])
+    dl_attempts = find_col(df, prefix='y1_', contains=['FTP下载尝试次数'])
+
+    dl_drop_rate = calc_drop_rate(df, dl_drop_count, dl_attempts, dl_drop_rate_col)
+    if dl_drop_rate is not None:
+        df['dl_drop_rate_calc'] = dl_drop_rate
+        derived.append('dl_drop_rate_calc')
+
+    if avg_dl and dl_drop_rate is not None:
+        df['effective_dl'] = df[avg_dl] * (1 - dl_drop_rate)
+        derived.append('effective_dl')
+
+    if avg_dl and peak_dl:
+        df['dl_tail_drag'] = df[peak_dl] - df[avg_dl]
+        derived.append('dl_tail_drag')
+
+    if dl_drop_count and 'test_duration_h' in df.columns:
+        df['dl_drops_per_hour'] = safe_divide(df[dl_drop_count], df['test_duration_h'])
+        derived.append('dl_drops_per_hour')
+
+    if dl_drop_count and 'test_distance_km' in df.columns:
+        df['dl_drops_per_km'] = safe_divide(df[dl_drop_count], df['test_distance_km'])
+        derived.append('dl_drops_per_km')
+
+    avg_ul = find_col(df, prefix='z1_', contains=['应用层上行平均吞吐率'])
+    peak_ul = find_col(df, prefix='z1_', contains_any=['上行前10%峰值速率', '上行前10%峰值率'])
+    ul_drop_rate_col = find_col(df, prefix='z1_', contains=['FTP上传掉线率'])
+    ul_drop_count = find_col(df, prefix='z1_', contains=['FTP上传掉线次数'])
+    ul_attempts = find_col(df, prefix='z1_', contains=['FTP上传尝试次数'])
+
+    ul_drop_rate = calc_drop_rate(df, ul_drop_count, ul_attempts, ul_drop_rate_col)
+    if ul_drop_rate is not None:
+        df['ul_drop_rate_calc'] = ul_drop_rate
+        derived.append('ul_drop_rate_calc')
+
+    if avg_ul and ul_drop_rate is not None:
+        df['effective_ul'] = df[avg_ul] * (1 - ul_drop_rate)
+        derived.append('effective_ul')
+
+    if avg_ul and peak_ul:
+        df['ul_tail_drag'] = df[peak_ul] - df[avg_ul]
+        derived.append('ul_tail_drag')
+
+    if ul_drop_count and 'test_duration_h' in df.columns:
+        df['ul_drops_per_hour'] = safe_divide(df[ul_drop_count], df['test_duration_h'])
+        derived.append('ul_drops_per_hour')
+
+    if ul_drop_count and 'test_distance_km' in df.columns:
+        df['ul_drops_per_km'] = safe_divide(df[ul_drop_count], df['test_distance_km'])
+        derived.append('ul_drops_per_km')
+
+    stay_ratio = find_col(df, contains=['时长驻留比'])
+    stay_duration = find_col(df, contains=['驻留时长'])
+    x1_cov5g = find_col(df, prefix='x1_', contains=['覆盖率3']) or find_col(df, prefix='x1_', contains=['覆盖率4'])
+    if stay_ratio and x1_cov5g:
+        df['availability'] = df[stay_ratio] * df[x1_cov5g]
+        derived.append('availability')
+
+    if stay_duration and 'test_distance_km' in df.columns:
+        df['stay_eff'] = safe_divide(df[stay_duration], df['test_distance_km'])
+        derived.append('stay_eff')
+
+    return derived
+
+
+def mobility_penalty(df, group_cols, metric_cols):
+    if 'scene_l1' not in df.columns:
+        return pd.DataFrame()
+    rows = []
+    for keys, group in df.groupby(group_cols):
+        dt = group[group['scene_l1'] == '驶测']
+        cqt = group[group['scene_l1'] == '定点']
+        if dt.empty or cqt.empty:
+            continue
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        row = dict(zip(group_cols, keys))
+        for col in metric_cols:
+            row[f'{col}_dt_mean'] = float(dt[col].mean())
+            row[f'{col}_cqt_mean'] = float(cqt[col].mean())
+            row[f'{col}_penalty'] = row[f'{col}_dt_mean'] - row[f'{col}_cqt_mean']
+            row[f'{col}_n_dt'] = int(dt[col].notna().sum())
+            row[f'{col}_n_cqt'] = int(cqt[col].notna().sum())
+        rows.append(row)
+    return pd.DataFrame(rows)
 
 
 def plot_city_operator_bar(df, metric_col, out_path, title):
@@ -396,7 +560,15 @@ for sheet in xl.sheet_names:
     df.to_csv(out_clean, index=False, encoding='utf-8-sig')
 
     rsrp, sinr, cov1, dl, ul = pick_metrics(df)
-    metrics = [m for m in [rsrp, sinr, cov1, dl, ul] if m]
+    base_metrics = [m for m in [rsrp, sinr, cov1, dl, ul] if m]
+
+    derived_cols = compute_derived_metrics(df)
+    weight_metrics = base_metrics + [c for c in ['effective_dl', 'effective_ul'] if c in df.columns]
+    test_metrics = base_metrics + [c for c in ['effective_dl', 'effective_ul'] if c in df.columns]
+    summary_metrics = base_metrics + [c for c in [
+        'effective_dl', 'effective_ul', 'dl_drops_per_hour', 'ul_drops_per_hour',
+        'abs_delta_rsrp', 'abs_delta_cov2', 'availability'
+    ] if c in df.columns]
 
     weight_col = choose_weight_col(df)
 
@@ -434,24 +606,30 @@ for sheet in xl.sheet_names:
     )
 
     # Weighted means
-    weighted_df = weighted_group_mean(df, ['operator'], metrics, weight_col)
+    weighted_df = weighted_group_mean(df, ['operator'], weight_metrics, weight_col)
     if not weighted_df.empty:
         weighted_df.to_csv(os.path.join(OUT_DIR, f'{sheet}_operator_weighted.csv'), index=False, encoding='utf-8-sig')
 
     # Robust stats
-    robust_df = robust_group_stats(df, 'operator', metrics)
+    robust_df = robust_group_stats(df, 'operator', base_metrics)
     if not robust_df.empty:
         robust_df.to_csv(os.path.join(OUT_DIR, f'{sheet}_operator_robust.csv'), index=False, encoding='utf-8-sig')
 
     # Composite scores
-    comp_df = composite_scores(df, 'operator', metrics)
+    comp_df = composite_scores(df, 'operator', base_metrics)
     if not comp_df.empty:
         comp_df.to_csv(os.path.join(OUT_DIR, f'{sheet}_operator_composite.csv'), index=False, encoding='utf-8-sig')
 
     # Significance tests
-    ttest_df = pairwise_ttests(df, 'operator', metrics)
+    ttest_df = pairwise_ttests(df, 'operator', test_metrics)
     if not ttest_df.empty:
         ttest_df.to_csv(os.path.join(OUT_DIR, f'{sheet}_significance.csv'), index=False, encoding='utf-8-sig')
+
+    # Mobility penalty
+    penalty_metrics = [m for m in [dl, ul, rsrp, sinr, 'effective_dl', 'effective_ul'] if m in df.columns]
+    mobility_df = mobility_penalty(df, ['operator'], penalty_metrics)
+    if not mobility_df.empty:
+        mobility_df.to_csv(os.path.join(OUT_DIR, f'{sheet}_mobility_penalty.csv'), index=False, encoding='utf-8-sig')
 
     # Summary
     summary_lines.append(f'## {sheet}')
@@ -460,7 +638,7 @@ for sheet in xl.sheet_names:
     summary_lines.append(f'- 一级场景输出：{sheet}_scene1_operator_mean.csv、{sheet}_scene1_operator_bar.png')
 
     missing_items = []
-    for col, valid, miss_rate in missing_summary(df, metrics):
+    for col, valid, miss_rate in missing_summary(df, summary_metrics):
         missing_items.append(f'{metric_label(col)} {miss_rate * 100:.1f}% (n={valid})')
     if missing_items:
         summary_lines.append(f'- 关键指标缺失率：' + '，'.join(missing_items))
@@ -488,6 +666,35 @@ for sheet in xl.sheet_names:
         if top_op:
             summary_lines.append(f'- 上行吞吐率最优运营商：{top_op[0]}（{top_op[1]:.3f}）')
 
+    if 'effective_dl' in df.columns:
+        top_op = top_entity(df, 'operator', 'effective_dl', 'max')
+        if top_op:
+            summary_lines.append(f'- 有效下行吞吐率最优运营商：{top_op[0]}（{top_op[1]:.3f}）')
+    if 'effective_ul' in df.columns:
+        top_op = top_entity(df, 'operator', 'effective_ul', 'max')
+        if top_op:
+            summary_lines.append(f'- 有效上行吞吐率最优运营商：{top_op[0]}（{top_op[1]:.3f}）')
+    if 'dl_drops_per_hour' in df.columns:
+        top_op = top_entity(df, 'operator', 'dl_drops_per_hour', 'min')
+        if top_op:
+            summary_lines.append(f'- 下载掉线强度(次/小时)最优运营商：{top_op[0]}（{top_op[1]:.3f}）')
+    if 'ul_drops_per_hour' in df.columns:
+        top_op = top_entity(df, 'operator', 'ul_drops_per_hour', 'min')
+        if top_op:
+            summary_lines.append(f'- 上传掉线强度(次/小时)最优运营商：{top_op[0]}（{top_op[1]:.3f}）')
+    if 'abs_delta_rsrp' in df.columns:
+        top_op = top_entity(df, 'operator', 'abs_delta_rsrp', 'min')
+        if top_op:
+            summary_lines.append(f'- RSRP空间不均匀度最优运营商：{top_op[0]}（{top_op[1]:.3f}）')
+    if 'abs_delta_cov2' in df.columns:
+        top_op = top_entity(df, 'operator', 'abs_delta_cov2', 'min')
+        if top_op:
+            summary_lines.append(f'- 覆盖率2空间不均匀度最优运营商：{top_op[0]}（{top_op[1]:.3f}）')
+    if 'availability' in df.columns:
+        top_op = top_entity(df, 'operator', 'availability', 'max')
+        if top_op:
+            summary_lines.append(f'- 5G可用性最优运营商：{top_op[0]}（{top_op[1]:.3f}）')
+
     if weight_col and not weighted_df.empty and rsrp:
         w_col = f'{rsrp}_wmean'
         if w_col in weighted_df.columns:
@@ -508,6 +715,21 @@ for sheet in xl.sheet_names:
         comp_sorted = comp_df.sort_values('composite_score', ascending=False)
         best = comp_sorted.iloc[0]
         summary_lines.append(f'- 综合评分最优运营商：{best["operator"]}（{best["composite_score"]:.3f}）')
+
+    if not mobility_df.empty:
+        penalty_metric = None
+        for candidate in ['effective_dl', dl, rsrp]:
+            if candidate and f'{candidate}_penalty' in mobility_df.columns:
+                penalty_metric = candidate
+                break
+        if penalty_metric:
+            pcol = f'{penalty_metric}_penalty'
+            subset = mobility_df[['operator', pcol]].dropna()
+            if not subset.empty:
+                worst = subset.loc[subset[pcol].idxmin()]
+                summary_lines.append(
+                    f'- DT相对CQT移动惩罚（{metric_label(penalty_metric)}）：{worst["operator"]}（{worst[pcol]:.3f}）'
+                )
 
     if not ttest_df.empty:
         sig = ttest_df.loc[ttest_df['p_value'] < 0.05]
