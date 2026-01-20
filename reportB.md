@@ -32,7 +32,7 @@
 
 ### 3.1 全局概览
 
-关键数据： total_records=93,850,560; total_flow=8.977e10 MB; date_range=2021-02-09~2021-04-09 (60 days); flow_mean=956.57, flow_std=1493.66 (CV=1.56); user_mean=269.12, user_std=393.58 (CV=1.46); cell_corr(flow_sum,user_sum)=0.669; daily_max=1,797,291,580 (2021-04-09), daily_min=1,073,917,202 (2021-02-15), diff=67.4%.
+关键数据： total_records=93,850,560; total_flow=8.977e10 MB; date_range=2021-02-09~2021-04-09 (60 days); flow_mean=956.57, flow_std=1493.66 (CV=1.56); user_mean=269.12, user_std=393.58 (CV=1.46); cell_corr(flow_sum,user_sum)=0.669; daily_max=1,797,291,580 (2021-04-09), daily_min=1,073,917,202 (2021-02-15), diff=67.4%; cells=65174; type share: T1=38702 (59.4%), T0=25108 (38.5%), T2=1364 (2.1%); top scenes: S2=18544 (28.5%), S5=16185 (24.8%), S6=8746 (13.4%); top combos: S2-T1=14512 (22.3%), S5-T0=11400 (17.5%), S6-T1=8560 (13.1%).
 
 全量有效记录数为 93,850,560 条（FLOW_SUM/USER_COUNT 均为非负），核心统计量如下：
 
@@ -68,6 +68,26 @@
 含义：该图展示全网日总用户数走势。
 意义：全网日总用户数走势, 刻画随时间的变化与周期性规律。
 用法：全网日总用户数走势, 识别峰谷与突变点，支持容量与资源配置。
+
+![小区类型数量分布](report_assets/section3/fig32_cell_type_count.png)
+含义：该图展示小区类型数量分布。
+意义：小区类型数量分布, 量化不同 TYPE 的规模差异。
+用法：小区类型数量分布, 用于资源分层与对比分析基线。
+
+![小区场景数量 Top12](report_assets/section3/fig33_cell_scene_count.png)
+含义：该图展示小区场景数量 Top12。
+意义：小区场景数量 Top12, 揭示场景集中度与主体来源。
+用法：小区场景数量 Top12, 作为场景分层与对比优先级依据。
+
+![场景×类型组合分布（Top12 场景）](report_assets/section3/fig34_scene_type_heatmap.png)
+含义：该图展示场景×类型组合分布（Top12 场景）。
+意义：场景×类型组合分布, 显示场景与类型的耦合结构。
+用法：场景×类型组合分布, 识别主导组合与稀缺组合。
+
+![场景×类型组合 Top10](report_assets/section3/fig35_scene_type_top10.png)
+含义：该图展示场景×类型组合 Top10。
+意义：场景×类型组合 Top10, 量化头部组合的规模优势。
+用法：场景×类型组合 Top10, 作为资源倾斜与精细化管理目标。
 
 ### 3.2 时间维度与节假日差异
 
@@ -279,7 +299,7 @@ TOP10 人均流量（单位：MB/人）：
 - 活跃度均值：`activity_mean = activity_sum / activity_count`
 - PAR 均值：`par_mean = par_sum / par_count`
 
-对应的产出文件：`section3_descriptive.py`、`report_assets/section3/section3_stats.json`、`report_assets/section3/section3_cell_agg.csv` 与 `report_assets/section3/fig01_flow_user_hist.png` 至 `report_assets/section3/fig31_silent_profile_grid.png`。
+对应的产出文件：`section3_descriptive.py`、`report_assets/section3/section3_stats.json`、`report_assets/section3/section3_cell_agg.csv` 与 `report_assets/section3/fig01_flow_user_hist.png` 至 `report_assets/section3/fig35_scene_type_top10.png`。
 
 ## 4. 多维度对比与趋势分析
 

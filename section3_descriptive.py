@@ -590,6 +590,56 @@ def main() -> None:
     plt.ylabel("\u7528\u6237\u6570")
     save_fig("fig05_daily_total_user.png")
 
+    cell_type_counts = cell_agg["TYPE"].value_counts().sort_index()
+    plt.figure(figsize=(6, 4))
+    sns.barplot(x=cell_type_counts.index.astype(int), y=cell_type_counts.values, color="#4C78A8")
+    plt.title("\u5c0f\u533a\u7c7b\u578b\u6570\u91cf\u5206\u5e03")
+    plt.xlabel("TYPE")
+    plt.ylabel("\u5c0f\u533a\u6570\u91cf")
+    save_fig("fig32_cell_type_count.png")
+
+    cell_scene_counts = cell_agg["SCENE"].value_counts()
+    top_scene_counts = cell_scene_counts.head(12)
+    plt.figure(figsize=(8, 4))
+    sns.barplot(x=top_scene_counts.index.astype(int), y=top_scene_counts.values, color="#72B7B2")
+    plt.title("\u5c0f\u533a\u573a\u666f\u6570\u91cf Top12")
+    plt.xlabel("SCENE")
+    plt.ylabel("\u5c0f\u533a\u6570\u91cf")
+    save_fig("fig33_cell_scene_count.png")
+
+    scene_type = cell_agg.pivot_table(
+        index="SCENE",
+        columns="TYPE",
+        values="CELL_ID",
+        aggfunc="count",
+        fill_value=0,
+    )
+    top_scene_index = cell_scene_counts.head(12).index
+    scene_type = scene_type.loc[scene_type.index.intersection(top_scene_index)]
+    if not scene_type.empty:
+        plt.figure(figsize=(8, 5))
+        sns.heatmap(scene_type, cmap="YlOrRd")
+        plt.title("\u573a\u666f\u00d7\u7c7b\u578b\u7ec4\u5408\u5206\u5e03\uff08Top12 \u573a\u666f\uff09")
+        plt.xlabel("TYPE")
+        plt.ylabel("SCENE")
+        save_fig("fig34_scene_type_heatmap.png")
+
+    combo_counts = (
+        cell_agg.groupby(["SCENE", "TYPE"])
+        .size()
+        .sort_values(ascending=False)
+        .head(10)
+    )
+    if not combo_counts.empty:
+        labels = [f"S{int(idx[0])}-T{int(idx[1])}" for idx in combo_counts.index]
+        plt.figure(figsize=(8, 4))
+        plt.bar(labels, combo_counts.values, color="#F58518")
+        plt.title("\u573a\u666f\u00d7\u7c7b\u578b\u7ec4\u5408 Top10")
+        plt.xlabel("\u7ec4\u5408")
+        plt.ylabel("\u5c0f\u533a\u6570\u91cf")
+        plt.xticks(rotation=30)
+        save_fig("fig35_scene_type_top10.png")
+
     hourly_agg = hourly_agg.reindex(range(24)).fillna(0)
     hourly_agg["flow_mean"] = hourly_agg["flow_sum"] / hourly_agg["flow_count"].replace(0, np.nan)
     hourly_agg["user_mean"] = hourly_agg["user_sum"] / hourly_agg["user_count"].replace(0, np.nan)
@@ -1012,6 +1062,13 @@ def main() -> None:
             "flow_per_user": fpu_global,
             "par": par_global,
             "activity": activity_global,
+        },
+        "cell_distribution": {
+            "type_counts": cell_type_counts.to_dict(),
+            "scene_counts_top12": top_scene_counts.to_dict(),
+            "scene_type_top10": {
+                f"S{int(k[0])}-T{int(k[1])}": int(v) for k, v in combo_counts.items()
+            },
         },
         "cells": {
             "total_cells": int(cell_agg.shape[0]),
