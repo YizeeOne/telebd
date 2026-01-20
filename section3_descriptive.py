@@ -14,8 +14,13 @@ import seaborn as sns
 DATA_PATH = Path("all_final_data_with_attributes.csv")
 OUT_DIR = Path("report_assets/section3")
 CHUNK_SIZE = 1_000_000
-MAX_SAMPLE = 120_000
-MAX_GEO_SAMPLE = 50_000
+HIST_BINS = 60
+SCATTER_BINS = 80
+FLOW_LOG_MAX = 14.0
+USER_LOG_MAX = 10.0
+FPU_LOG_MAX = 9.0
+PAR_LOG_MAX = 5.5
+ACTIVITY_MAX = 0.6
 
 COL_DATE = "\u65e5\u671f"
 COL_HOUR = "\u5c0f\u65f6"
@@ -128,21 +133,23 @@ def combine_cell_agg(
     return base
 
 
-def append_sample(
-    sample_df: pd.DataFrame | None,
-    new_sample: pd.DataFrame,
-    max_size: int,
-    seed: int,
-) -> pd.DataFrame:
-    if new_sample.empty:
-        return sample_df if sample_df is not None else pd.DataFrame()
-    if sample_df is None:
-        sample_df = new_sample.copy()
-    else:
-        sample_df = pd.concat([sample_df, new_sample], ignore_index=True)
-    if len(sample_df) > max_size:
-        sample_df = sample_df.sample(max_size, random_state=seed)
-    return sample_df
+def hist_quantile(edges: np.ndarray, counts: np.ndarray, q: float) -> float:
+    total = counts.sum()
+    if total == 0:
+        return np.nan
+    target = q * total
+    cumulative = np.cumsum(counts)
+    idx = int(np.searchsorted(cumulative, target))
+    if idx <= 0:
+        return float(edges[0])
+    if idx >= len(counts):
+        return float(edges[-1])
+    prev = cumulative[idx - 1]
+    count = counts[idx]
+    if count == 0:
+        return float(edges[idx])
+    frac = (target - prev) / count
+    return float(edges[idx] + frac * (edges[idx + 1] - edges[idx]))
 
 
 def weekday_labels(values: list[int]) -> list[str]:
@@ -207,8 +214,21 @@ def main() -> None:
     type_agg: pd.DataFrame | None = None
     cell_agg: pd.DataFrame | None = None
     cell_attrs: pd.DataFrame | None = None
-    sample_df: pd.DataFrame | None = None
-    geo_sample_df: pd.DataFrame | None = None
+
+    flow_bins = np.linspace(0, FLOW_LOG_MAX, HIST_BINS + 1)
+    user_bins = np.linspace(0, USER_LOG_MAX, HIST_BINS + 1)
+    fpu_bins = np.linspace(0, FPU_LOG_MAX, HIST_BINS + 1)
+    par_bins = np.linspace(0, PAR_LOG_MAX, HIST_BINS + 1)
+    activity_bins = np.linspace(0, ACTIVITY_MAX, HIST_BINS + 1)
+    scatter_x_bins = np.linspace(0, USER_LOG_MAX, SCATTER_BINS + 1)
+    scatter_y_bins = np.linspace(0, FLOW_LOG_MAX, SCATTER_BINS + 1)
+
+    flow_hist = np.zeros(HIST_BINS, dtype=np.int64)
+    user_hist = np.zeros(HIST_BINS, dtype=np.int64)
+    fpu_hist = np.zeros(HIST_BINS, dtype=np.int64)
+    par_hist = np.zeros(HIST_BINS, dtype=np.int64)
+    activity_hist = np.zeros(HIST_BINS, dtype=np.int64)
+    scatter_counts = np.zeros((SCATTER_BINS, SCATTER_BINS), dtype=np.int64)
 
     for idx, chunk in enumerate(
         pd.read_csv(
@@ -241,17 +261,28 @@ def main() -> None:
         update_stats(chunk["PAR"], par_stats)
         update_stats(chunk["ActivityScore"], activity_stats)
 
-        sample_cols = ["FLOW_SUM", "USER_COUNT", "flow_per_user", "PAR", "ActivityScore"]
-        sample = chunk[sample_cols].dropna(how="all")
-        if not sample.empty:
-            sample = sample.sample(n=min(5000, len(sample)), random_state=42 + idx)
-            sample_df = append_sample(sample_df, sample, MAX_SAMPLE, seed=100 + idx)
+        flow_log = np.log1p(chunk["FLOW_SUM"].to_numpy())
+        user_log = np.log1p(chunk["USER_COUNT"].to_numpy())
+        fpu_log = np.log1p(chunk["flow_per_user"].to_numpy())
+        par_log = np.log1p(chunk["PAR"].to_numpy())
+        activity_vals = chunk["ActivityScore"].to_numpy()
 
-        geo_cols = ["LONGITUDE", "LATITUDE", "FLOW_SUM", "SCENE", "flow_per_user"]
-        geo = chunk[geo_cols].dropna(how="any")
-        if not geo.empty:
-            geo = geo.sample(n=min(3000, len(geo)), random_state=7 + idx)
-            geo_sample_df = append_sample(geo_sample_df, geo, MAX_GEO_SAMPLE, seed=200 + idx)
+        flow_hist += np.histogram(flow_log[np.isfinite(flow_log)], bins=flow_bins)[0]
+        user_hist += np.histogram(user_log[np.isfinite(user_log)], bins=user_bins)[0]
+        fpu_hist += np.histogram(fpu_log[np.isfinite(fpu_log)], bins=fpu_bins)[0]
+        par_hist += np.histogram(par_log[np.isfinite(par_log)], bins=par_bins)[0]
+        activity_hist += np.histogram(
+            activity_vals[np.isfinite(activity_vals)], bins=activity_bins
+        )[0]
+
+        valid_mask = np.isfinite(flow_log) & np.isfinite(user_log)
+        if valid_mask.any():
+            hist2d, _, _ = np.histogram2d(
+                user_log[valid_mask],
+                flow_log[valid_mask],
+                bins=[scatter_x_bins, scatter_y_bins],
+            )
+            scatter_counts += hist2d.astype(np.int64)
 
         daily = (
             chunk.groupby(COL_DATE, as_index=False)[["FLOW_SUM", "USER_COUNT"]]
@@ -367,11 +398,6 @@ def main() -> None:
                 subset=["CELL_ID"], keep="first"
             )
 
-    if sample_df is None:
-        sample_df = pd.DataFrame()
-    if geo_sample_df is None:
-        geo_sample_df = pd.DataFrame()
-
     daily_agg = daily_agg.reset_index().rename(columns={COL_DATE: "date"})
     daily_agg["date"] = pd.to_datetime(daily_agg["date"], errors="coerce")
     daily_agg = daily_agg.sort_values("date")
@@ -416,69 +442,89 @@ def main() -> None:
         plt.savefig(OUT_DIR / name, dpi=150)
         plt.close()
 
-    if not sample_df.empty:
-        fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-        sns.histplot(np.log1p(sample_df["FLOW_SUM"].dropna()), bins=60, ax=axes[0])
-        axes[0].set_title("\u4e1a\u52a1\u6d41\u91cf\u5206\u5e03\uff08log1p\uff09")
-        axes[0].set_xlabel("log(1+\u4e1a\u52a1\u6d41\u91cf)")
-        axes[0].set_ylabel("\u6837\u672c\u6570\u91cf")
-        sns.histplot(np.log1p(sample_df["USER_COUNT"].dropna()), bins=60, ax=axes[1])
-        axes[1].set_title("\u7528\u6237\u6570\u5206\u5e03\uff08log1p\uff09")
-        axes[1].set_xlabel("log(1+\u7528\u6237\u6570)")
-        axes[1].set_ylabel("\u6837\u672c\u6570\u91cf")
-        save_fig("fig01_flow_user_hist.png")
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+    flow_centers = (flow_bins[:-1] + flow_bins[1:]) / 2
+    user_centers = (user_bins[:-1] + user_bins[1:]) / 2
+    axes[0].bar(flow_centers, flow_hist, width=np.diff(flow_bins), color="#4C78A8")
+    axes[0].set_title("\u4e1a\u52a1\u6d41\u91cf\u5206\u5e03\uff08log1p\uff09")
+    axes[0].set_xlabel("log(1+\u4e1a\u52a1\u6d41\u91cf)")
+    axes[0].set_ylabel("\u6837\u672c\u6570\u91cf")
+    axes[1].bar(user_centers, user_hist, width=np.diff(user_bins), color="#F58518")
+    axes[1].set_title("\u7528\u6237\u6570\u5206\u5e03\uff08log1p\uff09")
+    axes[1].set_xlabel("log(1+\u7528\u6237\u6570)")
+    axes[1].set_ylabel("\u6837\u672c\u6570\u91cf")
+    save_fig("fig01_flow_user_hist.png")
 
-        fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-        sns.boxplot(
-            y=np.log1p(sample_df["FLOW_SUM"].dropna()),
-            ax=axes[0],
-            color="#4C78A8",
-        )
-        axes[0].set_title("\u4e1a\u52a1\u6d41\u91cf\u7bb1\u7ebf\u56fe\uff08log1p\uff09")
-        axes[0].set_ylabel("log(1+\u4e1a\u52a1\u6d41\u91cf)")
-        sns.boxplot(
-            y=np.log1p(sample_df["USER_COUNT"].dropna()),
-            ax=axes[1],
-            color="#F58518",
-        )
-        axes[1].set_title("\u7528\u6237\u6570\u7bb1\u7ebf\u56fe\uff08log1p\uff09")
-        axes[1].set_ylabel("log(1+\u7528\u6237\u6570)")
-        save_fig("fig02_flow_user_box.png")
+    flow_box = {
+        "med": hist_quantile(flow_bins, flow_hist, 0.5),
+        "q1": hist_quantile(flow_bins, flow_hist, 0.25),
+        "q3": hist_quantile(flow_bins, flow_hist, 0.75),
+        "whislo": hist_quantile(flow_bins, flow_hist, 0.05),
+        "whishi": hist_quantile(flow_bins, flow_hist, 0.95),
+        "fliers": [],
+    }
+    user_box = {
+        "med": hist_quantile(user_bins, user_hist, 0.5),
+        "q1": hist_quantile(user_bins, user_hist, 0.25),
+        "q3": hist_quantile(user_bins, user_hist, 0.75),
+        "whislo": hist_quantile(user_bins, user_hist, 0.05),
+        "whishi": hist_quantile(user_bins, user_hist, 0.95),
+        "fliers": [],
+    }
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    axes[0].bxp([flow_box], showfliers=False)
+    axes[0].set_title("\u4e1a\u52a1\u6d41\u91cf\u5206\u4f4d\u7bb1\u56fe\uff08log1p\uff09")
+    axes[0].set_ylabel("log(1+\u4e1a\u52a1\u6d41\u91cf)")
+    axes[0].set_xticklabels(["FLOW_SUM"])
+    axes[1].bxp([user_box], showfliers=False)
+    axes[1].set_title("\u7528\u6237\u6570\u5206\u4f4d\u7bb1\u56fe\uff08log1p\uff09")
+    axes[1].set_ylabel("log(1+\u7528\u6237\u6570)")
+    axes[1].set_xticklabels(["USER_COUNT"])
+    save_fig("fig02_flow_user_box.png")
 
-        plt.figure(figsize=(6, 5))
-        plt.scatter(
-            sample_df["USER_COUNT"],
-            sample_df["FLOW_SUM"],
-            s=6,
-            alpha=0.3,
-        )
-        plt.xscale("log")
-        plt.yscale("log")
-        plt.title("\u4e1a\u52a1\u6d41\u91cf-\u7528\u6237\u6570\u6563\u70b9\uff08log-log\uff09")
-        plt.xlabel("\u7528\u6237\u6570")
-        plt.ylabel("\u4e1a\u52a1\u6d41\u91cf\uff08MB\uff09")
-        save_fig("fig03_flow_user_scatter.png")
+    plt.figure(figsize=(6, 5))
+    density = np.log1p(scatter_counts.T)
+    plt.imshow(
+        density,
+        origin="lower",
+        aspect="auto",
+        extent=[
+            scatter_x_bins[0],
+            scatter_x_bins[-1],
+            scatter_y_bins[0],
+            scatter_y_bins[-1],
+        ],
+        cmap="magma",
+    )
+    plt.colorbar(label="log(1+\u8ba1\u6570)")
+    plt.title("\u4e1a\u52a1\u6d41\u91cf-\u7528\u6237\u6570\u5bc6\u5ea6\uff08log1p\uff09")
+    plt.xlabel("log(1+\u7528\u6237\u6570)")
+    plt.ylabel("log(1+\u4e1a\u52a1\u6d41\u91cf)")
+    save_fig("fig03_flow_user_scatter.png")
 
-        plt.figure(figsize=(8, 4))
-        sns.histplot(sample_df["flow_per_user"].dropna(), bins=60, color="#72B7B2")
-        plt.title("\u4eba\u5747\u6d41\u91cf\u5206\u5e03")
-        plt.xlabel("\u4eba\u5747\u6d41\u91cf\uff08MB/\u4eba\uff09")
-        plt.ylabel("\u6837\u672c\u6570\u91cf")
-        save_fig("fig24_flow_per_user_hist.png")
+    plt.figure(figsize=(8, 4))
+    fpu_centers = (fpu_bins[:-1] + fpu_bins[1:]) / 2
+    plt.bar(fpu_centers, fpu_hist, width=np.diff(fpu_bins), color="#72B7B2")
+    plt.title("\u4eba\u5747\u6d41\u91cf\u5206\u5e03\uff08log1p\uff09")
+    plt.xlabel("log(1+\u4eba\u5747\u6d41\u91cf)")
+    plt.ylabel("\u6837\u672c\u6570\u91cf")
+    save_fig("fig24_flow_per_user_hist.png")
 
-        plt.figure(figsize=(8, 4))
-        sns.histplot(sample_df["PAR"].dropna(), bins=60, color="#E45756")
-        plt.title("PAR \u5206\u5e03")
-        plt.xlabel("PAR")
-        plt.ylabel("\u6837\u672c\u6570\u91cf")
-        save_fig("fig22_par_hist.png")
+    plt.figure(figsize=(8, 4))
+    par_centers = (par_bins[:-1] + par_bins[1:]) / 2
+    plt.bar(par_centers, par_hist, width=np.diff(par_bins), color="#E45756")
+    plt.title("PAR \u5206\u5e03\uff08log1p\uff09")
+    plt.xlabel("log(1+PAR)")
+    plt.ylabel("\u6837\u672c\u6570\u91cf")
+    save_fig("fig22_par_hist.png")
 
-        plt.figure(figsize=(8, 4))
-        sns.histplot(sample_df["ActivityScore"].dropna(), bins=60, color="#54A24B")
-        plt.title("\u6d3b\u8dc3\u5ea6\u8bc4\u5206\u5206\u5e03")
-        plt.xlabel("ActivityScore")
-        plt.ylabel("\u6837\u672c\u6570\u91cf")
-        save_fig("fig21_activityscore_hist.png")
+    plt.figure(figsize=(8, 4))
+    activity_centers = (activity_bins[:-1] + activity_bins[1:]) / 2
+    plt.bar(activity_centers, activity_hist, width=np.diff(activity_bins), color="#54A24B")
+    plt.title("\u6d3b\u8dc3\u5ea6\u8bc4\u5206\u5206\u5e03")
+    plt.xlabel("ActivityScore")
+    plt.ylabel("\u6837\u672c\u6570\u91cf")
+    save_fig("fig21_activityscore_hist.png")
 
     plt.figure(figsize=(10, 4))
     plt.plot(daily_agg["date"], daily_agg["flow_sum"])
@@ -687,14 +733,15 @@ def main() -> None:
         plt.ylabel("\u9ad8\u8d1f\u8377\u5c0f\u533a\u6570\u91cf")
         save_fig("fig21_highload_scene.png")
 
-    if not geo_sample_df.empty:
+    geo_df = cell_agg.dropna(subset=["LONGITUDE", "LATITUDE", "flow_per_user"])
+    if not geo_df.empty:
         plt.figure(figsize=(6, 6))
-        sizes = np.log1p(geo_sample_df["FLOW_SUM"].clip(lower=0)) * 8
+        sizes = np.log1p(geo_df["flow_sum"].clip(lower=0)) * 4
         plt.scatter(
-            geo_sample_df["LONGITUDE"],
-            geo_sample_df["LATITUDE"],
+            geo_df["LONGITUDE"],
+            geo_df["LATITUDE"],
             s=sizes,
-            c=geo_sample_df["flow_per_user"],
+            c=geo_df["flow_per_user"],
             cmap="viridis",
             alpha=0.4,
         )

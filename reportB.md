@@ -46,7 +46,7 @@
 
 ![业务流量与用户数箱线图](report_assets/section3/fig02_flow_user_box.png)
 
-![业务流量-用户数散点](report_assets/section3/fig03_flow_user_scatter.png)
+![业务流量-用户数密度](report_assets/section3/fig03_flow_user_scatter.png)
 
 ![全网日总流量走势](report_assets/section3/fig04_daily_total_flow.png)
 
@@ -204,7 +204,7 @@ Chart)：横轴经度，纵轴纬度，气泡大小代表流量大小，颜色�
 
 ### 5.1 小区画像聚类（多特征剖面）
 
-选取总流量排名前 2000 的小区，构建“24 小时流量占比 + 24 小时用户占比 + 关键指标（flow_mean、user_mean、flow_per_user、activity_mean）”的组合特征，并进行 K-means 聚类。综合轮廓系数、CH 与 DB 指标，最优 K=2，聚类规模分别为 1029 与 971。两类在峰值时段上存在明显差异：Cluster 0 峰值集中在 12 点，Cluster 1 峰值集中在 22 点，体现“午间主峰型”与“夜间活跃型”的对照。
+选取全量小区，构建“24 小时流量占比 + 24 小时用户占比 + 关键指标（flow_mean、user_mean、flow_per_user、activity_mean）”的组合特征，并进行 K-means 聚类。综合轮廓系数、CH 与 DB 指标，最优 K=2，聚类规模分别为 11819 与 53355。两类在峰值时段上存在明显差异：Cluster 0 峰值集中在 20 点，Cluster 1 峰值集中在 12 点，体现“夜间活跃型”与“午间主峰型”的对照。
 
 ![聚类能量曲线](report_assets/section5/fig01_elbow_kmeans.png)
 

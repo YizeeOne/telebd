@@ -20,7 +20,7 @@ CELL_AGG_PATH = Path("report_assets/section3/section3_cell_agg.csv")
 OUT_DIR = Path("report_assets/section5")
 
 CHUNK_SIZE = 1_000_000
-TOP_CELL_COUNT = 2000
+TOP_CELL_COUNT = None
 TEST_DAYS = 7
 
 
@@ -90,8 +90,11 @@ def main() -> None:
 
     cell_agg = pd.read_csv(CELL_AGG_PATH)
     cell_agg["CELL_ID"] = cell_agg["CELL_ID"].astype(int)
-    cell_agg = cell_agg.sort_values("flow_sum", ascending=False)
-    top_cells = cell_agg.head(TOP_CELL_COUNT)["CELL_ID"].tolist()
+    cell_agg_sorted = cell_agg.sort_values("flow_sum", ascending=False)
+    if TOP_CELL_COUNT:
+        top_cells = cell_agg_sorted.head(TOP_CELL_COUNT)["CELL_ID"].tolist()
+    else:
+        top_cells = cell_agg_sorted["CELL_ID"].tolist()
     target_cell = int(top_cells[0])
     top_set = set(top_cells)
     cell_index = {cell_id: idx for idx, cell_id in enumerate(top_cells)}
