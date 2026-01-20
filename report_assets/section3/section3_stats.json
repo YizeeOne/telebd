@@ -1,0 +1,159 @@
+{
+  "global": {
+    "flow": {
+      "count": 90565791,
+      "mean": 956.5719817541261,
+      "var": 2311216.258727676,
+      "std": 1520.2684824489638,
+      "min": 0.0,
+      "max": 329743.90625
+    },
+    "user": {
+      "count": 90565791,
+      "mean": 269.1196258861141,
+      "var": 160349.51248515674,
+      "std": 400.43665227493443,
+      "min": 0.0,
+      "max": 15925.0
+    }
+  },
+  "cells": {
+    "total_cells": 65174,
+    "silent_threshold": 0.5,
+    "silent_cells": 6,
+    "high_load_threshold": 6044390.209999987,
+    "high_load_cells": 652
+  },
+  "derived_metrics": {
+    "flow_mean": "小区平均业务流量 = flow_sum / flow_count",
+    "user_mean": "小区平均用户数 = user_sum / user_count",
+    "flow_per_user": "人均流量 = flow_sum / user_sum",
+    "flow_cv": "流量变异系数 = flow_std / flow_mean",
+    "silent_ratio": "静默比例 = silent_count / record_count",
+    "peak_ratio": "峰均比 = flow_max / flow_mean"
+  },
+  "top10_flow": [
+    {
+      "CELL_ID": 621,
+      "flow_sum": 24841324.0,
+      "SCENE": 2,
+      "TYPE": 1
+    },
+    {
+      "CELL_ID": 39033,
+      "flow_sum": 22768286.0,
+      "SCENE": 2,
+      "TYPE": 1
+    },
+    {
+      "CELL_ID": 620,
+      "flow_sum": 21292742.0,
+      "SCENE": 2,
+      "TYPE": 1
+    },
+    {
+      "CELL_ID": 59748,
+      "flow_sum": 20761956.0,
+      "SCENE": 18,
+      "TYPE": 1
+    },
+    {
+      "CELL_ID": 29982,
+      "flow_sum": 18876674.0,
+      "SCENE": 15,
+      "TYPE": 0
+    },
+    {
+      "CELL_ID": 29983,
+      "flow_sum": 17109736.0,
+      "SCENE": 15,
+      "TYPE": 0
+    },
+    {
+      "CELL_ID": 25630,
+      "flow_sum": 16823680.0,
+      "SCENE": 16,
+      "TYPE": 1
+    },
+    {
+      "CELL_ID": 31945,
+      "flow_sum": 16771411.0,
+      "SCENE": 0,
+      "TYPE": 0
+    },
+    {
+      "CELL_ID": 2821,
+      "flow_sum": 15508914.0,
+      "SCENE": 2,
+      "TYPE": 1
+    },
+    {
+      "CELL_ID": 53661,
+      "flow_sum": 14624996.0,
+      "SCENE": 2,
+      "TYPE": 1
+    }
+  ],
+  "top10_flow_per_user": [
+    {
+      "CELL_ID": 16334,
+      "flow_per_user": 83.5252685546875,
+      "SCENE": 5,
+      "TYPE": 0
+    },
+    {
+      "CELL_ID": 23361,
+      "flow_per_user": 72.0267333984375,
+      "SCENE": 16,
+      "TYPE": 1
+    },
+    {
+      "CELL_ID": 16308,
+      "flow_per_user": 61.232723236083984,
+      "SCENE": 5,
+      "TYPE": 0
+    },
+    {
+      "CELL_ID": 54676,
+      "flow_per_user": 57.90290451049805,
+      "SCENE": 5,
+      "TYPE": 0
+    },
+    {
+      "CELL_ID": 34900,
+      "flow_per_user": 57.57465362548828,
+      "SCENE": 5,
+      "TYPE": 0
+    },
+    {
+      "CELL_ID": 16305,
+      "flow_per_user": 56.510398864746094,
+      "SCENE": 5,
+      "TYPE": 0
+    },
+    {
+      "CELL_ID": 48672,
+      "flow_per_user": 56.15399169921875,
+      "SCENE": 5,
+      "TYPE": 0
+    },
+    {
+      "CELL_ID": 16311,
+      "flow_per_user": 54.95570755004883,
+      "SCENE": 5,
+      "TYPE": 0
+    },
+    {
+      "CELL_ID": 54688,
+      "flow_per_user": 53.4721565246582,
+      "SCENE": 5,
+      "TYPE": 0
+    },
+    {
+      "CELL_ID": 54681,
+      "flow_per_user": 53.429996490478516,
+      "SCENE": 5,
+      "TYPE": 0
+    }
+  ]
+}
