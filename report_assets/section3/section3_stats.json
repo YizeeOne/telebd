@@ -43,8 +43,8 @@
   },
   "cells": {
     "total_cells": 65174,
-    "silent_threshold": 0.5,
-    "silent_cells": 6,
+    "silent_threshold": 0.3,
+    "silent_cells": 27,
     "high_load_threshold": 6093868.3199999975,
     "high_load_cells": 652
   },

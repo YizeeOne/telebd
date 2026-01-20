@@ -174,6 +174,31 @@ def smooth_counts(counts: np.ndarray, passes: int = 2) -> np.ndarray:
     return smoothed
 
 
+def grid_shape(count: int, max_cols: int = 5) -> tuple[int, int]:
+    cols = max(1, min(max_cols, count))
+    rows = int(np.ceil(count / cols))
+    return rows, cols
+
+
+def annotate_empty(ax: plt.Axes, text: str = "\u65e0\u6570\u636e") -> None:
+    ax.text(0.5, 0.5, text, ha="center", va="center")
+    ax.set_axis_off()
+
+
+def bar_subplot(
+    ax: plt.Axes,
+    labels: pd.Series,
+    values: pd.Series,
+    title: str,
+    ylabel: str,
+    color: str = "#4C78A8",
+) -> None:
+    ax.bar(labels, values, color=color)
+    ax.set_title(title, fontsize=10)
+    ax.set_ylabel(ylabel)
+    ax.tick_params(axis="x", rotation=30)
+
+
 def weekday_labels(values: list[int]) -> list[str]:
     mapping = {
         0: "\u5468\u4e00",
@@ -455,7 +480,7 @@ def main() -> None:
     activity_global = summarize_global(activity_stats)
 
     high_load_threshold = cell_agg["flow_sum"].quantile(0.99)
-    silent_threshold = 0.5
+    silent_threshold = 0.3
     high_load_cells = cell_agg[cell_agg["flow_sum"] >= high_load_threshold]
     silent_cells = cell_agg[cell_agg["silent_ratio"] >= silent_threshold]
 
@@ -731,6 +756,33 @@ def main() -> None:
     plt.xticks(rotation=30, ha="right")
     save_fig("fig18_top10_flow_per_user.png")
 
+    top_metrics = [
+        ("flow_sum", "TOP10 \u5c0f\u533a\u603b\u6d41\u91cf", "\u603b\u6d41\u91cf(MB)", "#4C78A8"),
+        ("user_sum", "TOP10 \u5c0f\u533a\u603b\u7528\u6237\u6570", "\u603b\u7528\u6237\u6570", "#F58518"),
+        ("flow_mean", "TOP10 \u5c0f\u533a\u5e73\u5747\u6d41\u91cf", "\u5e73\u5747\u6d41\u91cf(MB)", "#72B7B2"),
+        ("user_mean", "TOP10 \u5c0f\u533a\u5e73\u5747\u7528\u6237\u6570", "\u5e73\u5747\u7528\u6237\u6570", "#54A24B"),
+        ("flow_per_user", "TOP10 \u4eba\u5747\u6d41\u91cf", "MB/\u4eba", "#E45756"),
+        ("peak_ratio", "TOP10 \u5cf0\u5747\u6bd4", "\u5cf0\u5747\u6bd4", "#B279A2"),
+        ("flow_cv", "TOP10 \u6d41\u91cfCV", "CV", "#9D755D"),
+        ("user_cv", "TOP10 \u7528\u6237CV", "CV", "#4C78A8"),
+        ("activity_mean", "TOP10 \u6d3b\u8dc3\u5ea6", "\u6d3b\u8dc3\u5ea6", "#F28E2B"),
+        ("par_mean", "TOP10 PAR \u5747\u503c", "PAR", "#76B7B2"),
+    ]
+    rows, cols = grid_shape(len(top_metrics), max_cols=5)
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 4, rows * 3))
+    axes = np.array(axes).reshape(rows, cols)
+    for ax, (col, title, ylabel, color) in zip(axes.flat, top_metrics):
+        metric_df = cell_agg[["CELL_ID", col]].dropna()
+        metric_top = metric_df.nlargest(10, col)
+        if metric_top.empty:
+            annotate_empty(ax)
+            continue
+        labels = metric_top["CELL_ID"].astype(str)
+        bar_subplot(ax, labels, metric_top[col], title, ylabel, color)
+    for ax in axes.flat[len(top_metrics) :]:
+        ax.axis("off")
+    save_fig("fig28_top_metrics_grid.png")
+
     plt.figure(figsize=(8, 4))
     sns.histplot(cell_agg["silent_ratio"].dropna(), bins=40, color="#B279A2")
     plt.title("\u5c0f\u533a\u9759\u9ed8\u6bd4\u4f8b\u5206\u5e03")
@@ -755,6 +807,185 @@ def main() -> None:
         plt.xlabel("\u573a\u666f\uff08SCENE\uff09")
         plt.ylabel("\u9ad8\u8d1f\u8377\u5c0f\u533a\u6570\u91cf")
         save_fig("fig21_highload_scene.png")
+
+    dist_metrics = [
+        ("silent_ratio", "\u9759\u9ed8\u6bd4\u4f8b\u5206\u5e03", "\u9759\u9ed8\u6bd4\u4f8b", "#B279A2", False),
+        ("peak_ratio", "\u5cf0\u5747\u6bd4\u5206\u5e03\uff0899% \u88c1\u526a\uff09", "\u5cf0\u5747\u6bd4", "#4C78A8", True),
+        ("flow_cv", "\u6d41\u91cfCV\u5206\u5e03\uff0899% \u88c1\u526a\uff09", "\u6d41\u91cfCV", "#9D755D", True),
+        ("user_cv", "\u7528\u6237CV\u5206\u5e03\uff0899% \u88c1\u526a\uff09", "\u7528\u6237CV", "#F58518", True),
+        ("activity_mean", "\u6d3b\u8dc3\u5ea6\u5206\u5e03", "\u6d3b\u8dc3\u5ea6", "#54A24B", False),
+        ("flow_per_user", "\u4eba\u5747\u6d41\u91cf\u5206\u5e03\uff0899% \u88c1\u526a\uff09", "MB/\u4eba", "#72B7B2", True),
+    ]
+    rows, cols = grid_shape(len(dist_metrics), max_cols=3)
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 4, rows * 3))
+    axes = np.array(axes).reshape(rows, cols)
+    for ax, (col, title, xlabel, color, clip_tail) in zip(axes.flat, dist_metrics):
+        series = cell_agg[col].dropna()
+        if series.empty:
+            annotate_empty(ax)
+            continue
+        if clip_tail:
+            series = series.clip(upper=series.quantile(0.99))
+        ax.hist(series, bins=40, color=color)
+        ax.set_title(title, fontsize=10)
+        ax.set_xlabel(xlabel)
+    for ax in axes.flat[len(dist_metrics) :]:
+        ax.axis("off")
+    save_fig("fig29_anomaly_dist_grid.png")
+
+    highload_panels = 6
+    rows, cols = grid_shape(highload_panels, max_cols=3)
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 4, rows * 3))
+    axes = np.array(axes).reshape(rows, cols).flat
+
+    ax = axes[0]
+    if high_load_cells.empty:
+        annotate_empty(ax)
+    else:
+        high_scene = high_load_cells["SCENE"].value_counts().sort_values(ascending=False).head(10)
+        bar_subplot(ax, high_scene.index.astype(int).astype(str), high_scene.values, "\u9ad8\u8d1f\u8377\u573a\u666f\u5206\u5e03", "\u6570\u91cf")
+
+    ax = axes[1]
+    if high_load_cells.empty:
+        annotate_empty(ax)
+    else:
+        high_type = high_load_cells["TYPE"].value_counts().sort_values(ascending=False)
+        bar_subplot(ax, high_type.index.astype(int).astype(str), high_type.values, "\u9ad8\u8d1f\u8377 TYPE \u5206\u5e03", "\u6570\u91cf", "#F58518")
+
+    ax = axes[2]
+    if high_load_cells.empty:
+        annotate_empty(ax)
+    else:
+        top_highload = high_load_cells.sort_values("flow_sum", ascending=False).head(10)
+        bar_subplot(
+            ax,
+            top_highload["CELL_ID"].astype(str),
+            top_highload["flow_sum"],
+            "\u9ad8\u8d1f\u8377 TOP10 \u603b\u6d41\u91cf",
+            "\u603b\u6d41\u91cf(MB)",
+            "#E45756",
+        )
+
+    ax = axes[3]
+    if high_load_cells.empty:
+        annotate_empty(ax)
+    else:
+        top_highload = high_load_cells.sort_values("peak_ratio", ascending=False).head(10)
+        bar_subplot(
+            ax,
+            top_highload["CELL_ID"].astype(str),
+            top_highload["peak_ratio"],
+            "\u9ad8\u8d1f\u8377 TOP10 \u5cf0\u5747\u6bd4",
+            "\u5cf0\u5747\u6bd4",
+            "#9D755D",
+        )
+
+    ax = axes[4]
+    if high_load_cells.empty:
+        annotate_empty(ax)
+    else:
+        top_highload = high_load_cells.sort_values("flow_per_user", ascending=False).head(10)
+        bar_subplot(
+            ax,
+            top_highload["CELL_ID"].astype(str),
+            top_highload["flow_per_user"],
+            "\u9ad8\u8d1f\u8377 TOP10 \u4eba\u5747\u6d41\u91cf",
+            "MB/\u4eba",
+            "#72B7B2",
+        )
+
+    ax = axes[5]
+    highload_fpu = high_load_cells["flow_per_user"].dropna()
+    other_fpu = cell_agg.loc[cell_agg["flow_sum"] < high_load_threshold, "flow_per_user"].dropna()
+    if highload_fpu.empty or other_fpu.empty:
+        annotate_empty(ax)
+    else:
+        ax.boxplot(
+            [highload_fpu, other_fpu],
+            tick_labels=["\u9ad8\u8d1f\u8377", "\u975e\u9ad8\u8d1f\u8377"],
+            showfliers=False,
+        )
+        ax.set_title("\u4eba\u5747\u6d41\u91cf\u5bf9\u6bd4", fontsize=10)
+        ax.set_ylabel("MB/\u4eba")
+
+    save_fig("fig30_highload_profile_grid.png")
+
+    silent_panels = 6
+    rows, cols = grid_shape(silent_panels, max_cols=3)
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 4, rows * 3))
+    axes = np.array(axes).reshape(rows, cols).flat
+
+    ax = axes[0]
+    if silent_cells.empty:
+        annotate_empty(ax)
+    else:
+        silent_scene = silent_cells["SCENE"].value_counts().sort_values(ascending=False).head(10)
+        bar_subplot(ax, silent_scene.index.astype(int).astype(str), silent_scene.values, "\u9759\u9ed8\u573a\u666f\u5206\u5e03", "\u6570\u91cf", "#FF9DA6")
+
+    ax = axes[1]
+    if silent_cells.empty:
+        annotate_empty(ax)
+    else:
+        silent_type = silent_cells["TYPE"].value_counts().sort_values(ascending=False)
+        bar_subplot(ax, silent_type.index.astype(int).astype(str), silent_type.values, "\u9759\u9ed8 TYPE \u5206\u5e03", "\u6570\u91cf", "#72B7B2")
+
+    ax = axes[2]
+    if silent_cells.empty:
+        annotate_empty(ax)
+    else:
+        top_silent = silent_cells.sort_values("silent_ratio", ascending=False).head(10)
+        bar_subplot(
+            ax,
+            top_silent["CELL_ID"].astype(str),
+            top_silent["silent_ratio"],
+            "\u9759\u9ed8 TOP10 \u6bd4\u4f8b",
+            "\u9759\u9ed8\u6bd4\u4f8b",
+            "#B279A2",
+        )
+
+    ax = axes[3]
+    if silent_cells.empty:
+        annotate_empty(ax)
+    else:
+        top_silent = silent_cells.sort_values("activity_mean", ascending=False).head(10)
+        bar_subplot(
+            ax,
+            top_silent["CELL_ID"].astype(str),
+            top_silent["activity_mean"],
+            "\u9759\u9ed8 TOP10 \u6d3b\u8dc3\u5ea6",
+            "\u6d3b\u8dc3\u5ea6",
+            "#54A24B",
+        )
+
+    ax = axes[4]
+    silent_activity = silent_cells["activity_mean"].dropna()
+    other_activity = cell_agg.loc[cell_agg["silent_ratio"] < silent_threshold, "activity_mean"].dropna()
+    if silent_activity.empty or other_activity.empty:
+        annotate_empty(ax)
+    else:
+        ax.boxplot(
+            [silent_activity, other_activity],
+            tick_labels=["\u9759\u9ed8", "\u975e\u9759\u9ed8"],
+            showfliers=False,
+        )
+        ax.set_title("\u6d3b\u8dc3\u5ea6\u5bf9\u6bd4", fontsize=10)
+        ax.set_ylabel("\u6d3b\u8dc3\u5ea6")
+
+    ax = axes[5]
+    silent_fpu = silent_cells["flow_per_user"].dropna()
+    other_fpu = cell_agg.loc[cell_agg["silent_ratio"] < silent_threshold, "flow_per_user"].dropna()
+    if silent_fpu.empty or other_fpu.empty:
+        annotate_empty(ax)
+    else:
+        ax.boxplot(
+            [silent_fpu, other_fpu],
+            tick_labels=["\u9759\u9ed8", "\u975e\u9759\u9ed8"],
+            showfliers=False,
+        )
+        ax.set_title("\u4eba\u5747\u6d41\u91cf\u5bf9\u6bd4", fontsize=10)
+        ax.set_ylabel("MB/\u4eba")
+
+    save_fig("fig31_silent_profile_grid.png")
 
     geo_df = cell_agg.dropna(subset=["LONGITUDE", "LATITUDE", "flow_per_user"])
     if not geo_df.empty:
