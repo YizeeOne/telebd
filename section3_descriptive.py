@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -20,6 +21,39 @@ COL_DATE = "\u65e5\u671f"
 COL_HOUR = "\u5c0f\u65f6"
 COL_WEEKDAY = "\u661f\u671f"
 COL_HOLIDAY = "\u662f\u5426\u8282\u5047\u65e5"
+HOLIDAYS_2021 = {
+    date.fromisoformat(day)
+    for day in [
+        "2021-02-11",
+        "2021-02-12",
+        "2021-02-13",
+        "2021-02-14",
+        "2021-02-15",
+        "2021-02-16",
+        "2021-02-17",
+        "2021-04-03",
+        "2021-04-04",
+        "2021-04-05",
+        "2021-05-01",
+        "2021-05-02",
+        "2021-05-03",
+        "2021-05-04",
+        "2021-05-05",
+        "2021-06-12",
+        "2021-06-13",
+        "2021-06-14",
+        "2021-09-19",
+        "2021-09-20",
+        "2021-09-21",
+        "2021-10-01",
+        "2021-10-02",
+        "2021-10-03",
+        "2021-10-04",
+        "2021-10-05",
+        "2021-10-06",
+        "2021-10-07",
+    ]
+}
 
 
 def ensure_out_dir() -> None:
@@ -133,32 +167,26 @@ def main() -> None:
 
     usecols = [
         "CELL_ID",
+        "DATETIME_KEY",
         "FLOW_SUM",
         "USER_COUNT",
         "LATITUDE",
         "LONGITUDE",
         "TYPE",
         "SCENE",
-        COL_DATE,
-        COL_HOUR,
-        COL_WEEKDAY,
-        COL_HOLIDAY,
         "flow_per_user",
         "PAR",
         "ActivityScore",
     ]
     dtype = {
         "CELL_ID": "int32",
+        "DATETIME_KEY": "string",
         "FLOW_SUM": "float32",
         "USER_COUNT": "float32",
         "LATITUDE": "float32",
         "LONGITUDE": "float32",
         "TYPE": "float32",
         "SCENE": "float32",
-        COL_DATE: "string",
-        COL_HOUR: "float32",
-        COL_WEEKDAY: "float32",
-        COL_HOLIDAY: "object",
         "flow_per_user": "float32",
         "PAR": "float32",
         "ActivityScore": "float32",
@@ -201,13 +229,11 @@ def main() -> None:
         )
         chunk.loc[chunk["USER_COUNT"] <= 0, "flow_per_user"] = np.nan
 
-        chunk[COL_HOUR] = pd.to_numeric(chunk[COL_HOUR], errors="coerce").fillna(-1).astype(int)
-        chunk[COL_WEEKDAY] = (
-            pd.to_numeric(chunk[COL_WEEKDAY], errors="coerce").fillna(-1).astype(int)
-        )
-        chunk[COL_HOLIDAY] = (
-            pd.to_numeric(chunk[COL_HOLIDAY], errors="coerce").fillna(0).astype(int)
-        )
+        dt_values = pd.to_datetime(chunk["DATETIME_KEY"], errors="coerce")
+        chunk[COL_DATE] = dt_values.dt.date
+        chunk[COL_HOUR] = dt_values.dt.hour
+        chunk[COL_WEEKDAY] = dt_values.dt.weekday
+        chunk[COL_HOLIDAY] = dt_values.dt.date.isin(HOLIDAYS_2021).astype(int)
 
         update_stats(chunk["FLOW_SUM"], flow_stats)
         update_stats(chunk["USER_COUNT"], user_stats)
