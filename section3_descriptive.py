@@ -152,6 +152,28 @@ def hist_quantile(edges: np.ndarray, counts: np.ndarray, q: float) -> float:
     return float(edges[idx] + frac * (edges[idx + 1] - edges[idx]))
 
 
+def smooth_counts(counts: np.ndarray, passes: int = 2) -> np.ndarray:
+    kernel = np.array(
+        [[1.0, 2.0, 1.0], [2.0, 4.0, 2.0], [1.0, 2.0, 1.0]], dtype=np.float64
+    )
+    kernel /= kernel.sum()
+    smoothed = counts.astype(np.float64)
+    for _ in range(passes):
+        padded = np.pad(smoothed, 1, mode="edge")
+        smoothed = (
+            kernel[0, 0] * padded[:-2, :-2]
+            + kernel[0, 1] * padded[:-2, 1:-1]
+            + kernel[0, 2] * padded[:-2, 2:]
+            + kernel[1, 0] * padded[1:-1, :-2]
+            + kernel[1, 1] * padded[1:-1, 1:-1]
+            + kernel[1, 2] * padded[1:-1, 2:]
+            + kernel[2, 0] * padded[2:, :-2]
+            + kernel[2, 1] * padded[2:, 1:-1]
+            + kernel[2, 2] * padded[2:, 2:]
+        )
+    return smoothed
+
+
 def weekday_labels(values: list[int]) -> list[str]:
     mapping = {
         0: "\u5468\u4e00",
@@ -483,7 +505,8 @@ def main() -> None:
     save_fig("fig02_flow_user_box.png")
 
     plt.figure(figsize=(6, 5))
-    density = np.log1p(scatter_counts.T)
+    density_counts = smooth_counts(scatter_counts.T, passes=2)
+    density = np.log1p(density_counts)
     plt.imshow(
         density,
         origin="lower",
