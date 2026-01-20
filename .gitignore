@@ -1,3 +1,8 @@
-.__pycache__\
-.spec-workflow\
-
+.spec-workflow
+original/
+processed/
+attributes.csv
+数据集B说明.docx
+报告B.md
+报告B.docx
+all_final_data_with_attributes.zip
