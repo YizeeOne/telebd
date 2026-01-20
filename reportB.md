@@ -28,16 +28,19 @@
 
 ## 3. 描述性统计分析
 
+说明：本节必须使用 `all_final_data_with_attributes.csv`，该数据已包含属性字段与派生指标（日期、小时、星期、是否节假日、flow_per_user、PAR、ActivityScore 等）。在剔除负值、保留缺失为 NaN 的前提下完成统计与可视化。
+
 ### 3.1 全局概览
 
-在去除负值、保留缺失为 NaN 的前提下，对全量时序记录做总体统计。全量有效记录数为 90,565,791 条（FLOW_SUM/USER_COUNT 均为非负）。核心统计量如下：
+全量有效记录数为 93,850,560 条（FLOW_SUM/USER_COUNT 均为非负），核心统计量如下：
 
-|指标|均值|标准差|最小值|最大值|记录数|
+|指标|均值|标准差|最小值|最大值|有效记录数|
 |-|-|-|-|-|-|
-|业务流量（FLOW_SUM, MB）|956.57|1520.27|0.00|329743.91|90,565,791|
-|用户数（USER_COUNT）|269.12|400.44|0.00|15925.00|90,565,791|
-
-总体分布与波动特征见图 3-1 至 3-5，同时按场景维度比较小区平均水平（图 3-8、3-9）。
+|业务流量（FLOW_SUM, MB）|956.57|1493.66|0.00|329743.91|93,850,560|
+|用户数（USER_COUNT）|269.12|393.58|0.00|15925.00|93,850,560|
+|人均流量（flow_per_user, MB/人）|6.30|18.07|0.00|7050.71|93,488,836|
+|PAR|4.78|3.66|1.27|104.91|93,850,560|
+|ActivityScore|0.0099|0.0138|0.0000|0.5419|93,850,560|
 
 ![业务流量与用户数分布](report_assets/section3/fig01_flow_user_hist.png)
 
@@ -49,64 +52,106 @@
 
 ![全网日总用户数走势](report_assets/section3/fig05_daily_total_user.png)
 
-![不同场景的小区平均流量分布](report_assets/section3/fig08_scene_flow_box.png)
+### 3.2 时间维度与节假日差异
 
-![不同场景的小区平均用户数分布](report_assets/section3/fig09_scene_user_box.png)
+从小时、星期与节假日维度观察网络潮汐规律，并用热力图揭示“小时-星期”交互特征。
 
-### 3.2 TOP 分析
+![小时维度平均流量](report_assets/section3/fig06_hourly_mean_flow.png)
 
-从小区总流量与人均流量两个维度进行排名，识别核心贡献小区与高价值小区。
+![小时维度平均用户数](report_assets/section3/fig07_hourly_mean_user.png)
+
+![星期维度平均流量](report_assets/section3/fig08_weekday_mean_flow.png)
+
+![星期维度平均用户数](report_assets/section3/fig09_weekday_mean_user.png)
+
+![节假日与工作日的小时流量对比](report_assets/section3/fig25_hourly_holiday_flow.png)
+
+![节假日与工作日的小时用户数对比](report_assets/section3/fig26_hourly_holiday_user.png)
+
+![小时-星期维度流量热力图](report_assets/section3/fig15_hour_weekday_heatmap_flow.png)
+
+![小时-星期维度用户数热力图](report_assets/section3/fig16_hour_weekday_heatmap_user.png)
+
+### 3.3 场景与类型差异
+
+按场景（SCENE）与类型（TYPE）分析小区平均水平和总量结构，识别核心价值场景。
+
+![不同场景的小区平均流量分布](report_assets/section3/fig10_scene_flow_box.png)
+
+![不同场景的小区平均用户数分布](report_assets/section3/fig11_scene_user_box.png)
+
+![场景总流量 TOP10](report_assets/section3/fig12_scene_flow_share.png)
+
+![不同 TYPE 的平均流量](report_assets/section3/fig13_type_flow_bar.png)
+
+![不同 TYPE 的平均用户数](report_assets/section3/fig14_type_user_bar.png)
+
+### 3.4 TOP 分析
+
+从小区总流量与人均流量两个维度进行排名，识别核心贡献与高价值小区。
 
 TOP10 小区总流量（单位：百万 MB）：
 
 |排名|小区ID|场景|类型|总流量（百万MB）|
 |-|-|-|-|-|
-|1|621|2|1|24.84|
-|2|39033|2|1|22.77|
-|3|620|2|1|21.29|
-|4|59748|18|1|20.76|
-|5|29982|15|0|18.88|
-|6|29983|15|0|17.11|
-|7|25630|16|1|16.82|
-|8|31945|0|0|16.77|
-|9|2821|2|1|15.51|
-|10|53661|2|1|14.62|
+|1|621|2|1|24.89|
+|2|39033|2|1|22.82|
+|3|620|2|1|21.36|
+|4|59748|18|1|20.81|
+|5|29982|15|0|18.93|
+|6|29983|15|0|17.18|
+|7|25630|16|1|16.87|
+|8|31945|0|0|16.83|
+|9|2821|2|1|15.55|
+|10|53661|2|1|14.68|
 
 TOP10 人均流量（单位：MB/人）：
 
 |排名|小区ID|场景|类型|人均流量（MB/人）|
 |-|-|-|-|-|
-|1|16334|5|0|83.53|
-|2|23361|16|1|72.03|
-|3|16308|5|0|61.23|
-|4|54676|5|0|57.90|
-|5|34900|5|0|57.57|
-|6|16305|5|0|56.51|
-|7|48672|5|0|56.15|
-|8|16311|5|0|54.96|
-|9|54688|5|0|53.47|
-|10|54681|5|0|53.43|
+|1|16334|5|0|74.29|
+|2|54676|5|0|55.25|
+|3|16305|5|0|53.40|
+|4|16311|5|0|51.92|
+|5|54688|5|0|50.29|
+|6|54681|5|0|50.19|
+|7|16308|5|0|49.84|
+|8|54687|5|0|49.74|
+|9|16310|5|0|49.26|
+|10|54674|5|0|47.65|
 
-![TOP10 小区总流量](report_assets/section3/fig06_top10_flow.png)
+![TOP10 小区总流量](report_assets/section3/fig17_top10_flow.png)
 
-![TOP10 人均流量](report_assets/section3/fig07_top10_flow_per_user.png)
+![TOP10 人均流量](report_assets/section3/fig18_top10_flow_per_user.png)
 
-### 3.3 异常分析
+### 3.5 异常分析
 
-定义“静默小区”为“有用户无流量”的时间占比 ≥ 50% 的小区；定义“高负荷小区”为全量小区总流量位于前 1% 的小区（阈值 6,044,390.21 MB）。识别结果如下：
+定义“静默小区”为“有用户无流量”的时间占比 ≥ 50% 的小区；定义“高负荷小区”为全量小区总流量位于前 1% 的小区（阈值 6,093,868.32 MB）。识别结果如下：
 
 - 静默小区：6 个（占比极低，属于边缘异常）。
 - 高负荷小区：652 个（核心承载区，需重点关注扩容与保障）。
 
-![静默比例分布](report_assets/section3/fig10_silent_ratio_hist.png)
+![静默比例分布](report_assets/section3/fig19_silent_ratio_hist.png)
 
-![静默小区数量（按场景）](report_assets/section3/fig11_silent_scene.png)
+![静默小区数量（按场景）](report_assets/section3/fig20_silent_scene.png)
 
-![高负荷小区数量（按场景）](report_assets/section3/fig12_highload_scene.png)
+![高负荷小区数量（按场景）](report_assets/section3/fig21_highload_scene.png)
 
-### 3.4 流程与派生指标说明
+### 3.6 指标扩展与空间特征
 
-本节分析基于 `processed/cell_data_b*.csv` 与 `attributes.csv`，在剔除负值的前提下完成统计与可视化，输出了 12 张中文图表与小区聚合结果。派生指标口径如下：
+基于 flow_per_user、PAR、ActivityScore 与经纬度特征补充多维分析。
+
+![人均流量分布](report_assets/section3/fig24_flow_per_user_hist.png)
+
+![PAR 分布](report_assets/section3/fig22_par_hist.png)
+
+![活跃度评分分布](report_assets/section3/fig21_activityscore_hist.png)
+
+![经纬度泡泡图（大小=流量，颜色=人均流量）](report_assets/section3/fig27_geo_bubble_flow.png)
+
+### 3.7 流程与派生指标说明
+
+本节分析基于 `all_final_data_with_attributes.csv`，在剔除负值、保留缺失的前提下完成统计与可视化，输出 20+ 张中文图表与小区聚合结果。派生指标口径如下：
 
 - 小区平均业务流量：`flow_mean = flow_sum / flow_count`
 - 小区平均用户数：`user_mean = user_sum / user_count`
@@ -114,8 +159,10 @@ TOP10 人均流量（单位：MB/人）：
 - 流量变异系数：`flow_cv = flow_std / flow_mean`
 - 静默比例：`silent_ratio = silent_count / record_count`
 - 峰均比：`peak_ratio = flow_max / flow_mean`
+- 活跃度均值：`activity_mean = activity_sum / activity_count`
+- PAR 均值：`par_mean = par_sum / par_count`
 
-对应的产出文件：`section3_descriptive.py`、`report_assets/section3/section3_stats.json`、`report_assets/section3/section3_cell_agg.csv` 与 `report_assets/section3/fig01_flow_user_hist.png` 至 `report_assets/section3/fig12_highload_scene.png`。
+对应的产出文件：`section3_descriptive.py`、`report_assets/section3/section3_stats.json`、`report_assets/section3/section3_cell_agg.csv` 与 `report_assets/section3/fig01_flow_user_hist.png` 至 `report_assets/section3/fig27_geo_bubble_flow.png`。
 
 ## 4. 多维度对比与趋势分析
 

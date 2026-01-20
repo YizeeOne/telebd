@@ -10,9 +10,16 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-DATA_DIR = Path("processed")
-ATTR_PATH = Path("attributes.csv")
+DATA_PATH = Path("all_final_data_with_attributes.csv")
 OUT_DIR = Path("report_assets/section3")
+CHUNK_SIZE = 1_000_000
+MAX_SAMPLE = 120_000
+MAX_GEO_SAMPLE = 50_000
+
+COL_DATE = "\u65e5\u671f"
+COL_HOUR = "\u5c0f\u65f6"
+COL_WEEKDAY = "\u661f\u671f"
+COL_HOLIDAY = "\u662f\u5426\u8282\u5047\u65e5"
 
 
 def ensure_out_dir() -> None:
@@ -46,30 +53,6 @@ def update_stats(series: pd.Series, stats: dict) -> None:
     stats["max"] = float(max(stats["max"], values.max()))
 
 
-def combine_cell_agg(base: pd.DataFrame | None, add: pd.DataFrame) -> pd.DataFrame:
-    if base is None:
-        return add
-    base = base.reindex(base.index.union(add.index))
-    sum_cols = [
-        "flow_sum",
-        "user_sum",
-        "flow_sumsq",
-        "user_sumsq",
-        "flow_count",
-        "user_count",
-        "silent_count",
-        "record_count",
-    ]
-    max_cols = ["flow_max", "user_max"]
-    for col in sum_cols:
-        base[col] = base[col].fillna(0) + add[col].reindex(base.index).fillna(0)
-    for col in max_cols:
-        base[col] = np.maximum(
-            base[col].fillna(0), add[col].reindex(base.index).fillna(0)
-        )
-    return base
-
-
 def summarize_global(stats: dict) -> dict:
     if stats["count"] == 0:
         return {"count": 0, "mean": np.nan, "var": np.nan, "std": np.nan}
@@ -85,68 +68,233 @@ def summarize_global(stats: dict) -> dict:
     }
 
 
+def combine_sum(base: pd.DataFrame | None, add: pd.DataFrame) -> pd.DataFrame:
+    if base is None:
+        return add
+    base = base.reindex(base.index.union(add.index)).fillna(0)
+    add = add.reindex(base.index).fillna(0)
+    return base.add(add, fill_value=0)
+
+
+def combine_cell_agg(
+    base: pd.DataFrame | None,
+    add: pd.DataFrame,
+    sum_cols: list[str],
+    max_cols: list[str],
+) -> pd.DataFrame:
+    if base is None:
+        return add
+    base = base.reindex(base.index.union(add.index))
+    for col in sum_cols:
+        base[col] = base[col].fillna(0) + add[col].reindex(base.index).fillna(0)
+    for col in max_cols:
+        base[col] = np.maximum(
+            base[col].fillna(0), add[col].reindex(base.index).fillna(0)
+        )
+    return base
+
+
+def append_sample(
+    sample_df: pd.DataFrame | None,
+    new_sample: pd.DataFrame,
+    max_size: int,
+    seed: int,
+) -> pd.DataFrame:
+    if new_sample.empty:
+        return sample_df if sample_df is not None else pd.DataFrame()
+    if sample_df is None:
+        sample_df = new_sample.copy()
+    else:
+        sample_df = pd.concat([sample_df, new_sample], ignore_index=True)
+    if len(sample_df) > max_size:
+        sample_df = sample_df.sample(max_size, random_state=seed)
+    return sample_df
+
+
+def weekday_labels(values: list[int]) -> list[str]:
+    mapping = {
+        0: "\u5468\u4e00",
+        1: "\u5468\u4e8c",
+        2: "\u5468\u4e09",
+        3: "\u5468\u56db",
+        4: "\u5468\u4e94",
+        5: "\u5468\u516d",
+        6: "\u5468\u65e5",
+    }
+    return [mapping.get(int(v), str(v)) for v in values]
+
+
 def main() -> None:
     ensure_out_dir()
     set_cn_style()
 
-    files = sorted(DATA_DIR.glob("cell_data_b*.csv"))
-    if not files:
-        raise FileNotFoundError("未找到 processed/cell_data_b*.csv")
+    if not DATA_PATH.exists():
+        raise FileNotFoundError("\u672a\u627e\u5230 all_final_data_with_attributes.csv")
 
-    attrs = pd.read_csv(ATTR_PATH)
+    usecols = [
+        "CELL_ID",
+        "FLOW_SUM",
+        "USER_COUNT",
+        "LATITUDE",
+        "LONGITUDE",
+        "TYPE",
+        "SCENE",
+        COL_DATE,
+        COL_HOUR,
+        COL_WEEKDAY,
+        COL_HOLIDAY,
+        "flow_per_user",
+        "PAR",
+        "ActivityScore",
+    ]
+    dtype = {
+        "CELL_ID": "int32",
+        "FLOW_SUM": "float32",
+        "USER_COUNT": "float32",
+        "LATITUDE": "float32",
+        "LONGITUDE": "float32",
+        "TYPE": "float32",
+        "SCENE": "float32",
+        COL_DATE: "string",
+        COL_HOUR: "float32",
+        COL_WEEKDAY: "float32",
+        COL_HOLIDAY: "object",
+        "flow_per_user": "float32",
+        "PAR": "float32",
+        "ActivityScore": "float32",
+    }
+
     flow_stats = init_stats()
     user_stats = init_stats()
-    cell_agg: pd.DataFrame | None = None
-    daily_agg: pd.DataFrame | None = None
-    samples = []
+    fpu_stats = init_stats()
+    par_stats = init_stats()
+    activity_stats = init_stats()
 
-    for idx, path in enumerate(files, start=1):
-        df = pd.read_csv(
-            path,
-            usecols=["CELL_ID", "DATETIME_KEY", "FLOW_SUM", "USER_COUNT"],
-            dtype={
-                "CELL_ID": "int32",
-                "DATETIME_KEY": "string",
-                "FLOW_SUM": "float32",
-                "USER_COUNT": "float32",
-            },
+    daily_agg: pd.DataFrame | None = None
+    hourly_agg: pd.DataFrame | None = None
+    weekday_agg: pd.DataFrame | None = None
+    holiday_hour_agg: pd.DataFrame | None = None
+    heatmap_agg: pd.DataFrame | None = None
+    scene_agg: pd.DataFrame | None = None
+    type_agg: pd.DataFrame | None = None
+    cell_agg: pd.DataFrame | None = None
+    cell_attrs: pd.DataFrame | None = None
+    sample_df: pd.DataFrame | None = None
+    geo_sample_df: pd.DataFrame | None = None
+
+    for idx, chunk in enumerate(
+        pd.read_csv(
+            DATA_PATH,
+            usecols=usecols,
+            dtype=dtype,
+            chunksize=CHUNK_SIZE,
             na_values=["", "NA", "NaN"],
+        ),
+        start=1,
+    ):
+        chunk.loc[chunk["FLOW_SUM"] < 0, "FLOW_SUM"] = np.nan
+        chunk.loc[chunk["USER_COUNT"] < 0, "USER_COUNT"] = np.nan
+
+        safe_user = chunk["USER_COUNT"].where(chunk["USER_COUNT"] > 0)
+        chunk["flow_per_user"] = chunk["flow_per_user"].fillna(
+            chunk["FLOW_SUM"] / safe_user
+        )
+        chunk.loc[chunk["USER_COUNT"] <= 0, "flow_per_user"] = np.nan
+
+        chunk[COL_HOUR] = pd.to_numeric(chunk[COL_HOUR], errors="coerce").fillna(-1).astype(int)
+        chunk[COL_WEEKDAY] = (
+            pd.to_numeric(chunk[COL_WEEKDAY], errors="coerce").fillna(-1).astype(int)
+        )
+        chunk[COL_HOLIDAY] = (
+            pd.to_numeric(chunk[COL_HOLIDAY], errors="coerce").fillna(0).astype(int)
         )
 
-        df.loc[df["FLOW_SUM"] < 0, "FLOW_SUM"] = np.nan
-        df.loc[df["USER_COUNT"] < 0, "USER_COUNT"] = np.nan
+        update_stats(chunk["FLOW_SUM"], flow_stats)
+        update_stats(chunk["USER_COUNT"], user_stats)
+        update_stats(chunk["flow_per_user"], fpu_stats)
+        update_stats(chunk["PAR"], par_stats)
+        update_stats(chunk["ActivityScore"], activity_stats)
 
-        update_stats(df["FLOW_SUM"], flow_stats)
-        update_stats(df["USER_COUNT"], user_stats)
+        sample_cols = ["FLOW_SUM", "USER_COUNT", "flow_per_user", "PAR", "ActivityScore"]
+        sample = chunk[sample_cols].dropna(how="all")
+        if not sample.empty:
+            sample = sample.sample(n=min(5000, len(sample)), random_state=42 + idx)
+            sample_df = append_sample(sample_df, sample, MAX_SAMPLE, seed=100 + idx)
 
-        if not df.empty:
-            sample_n = min(5000, len(df))
-            samples.append(
-                df[["FLOW_SUM", "USER_COUNT"]].sample(
-                    n=sample_n, random_state=42 + idx
-                )
-            )
+        geo_cols = ["LONGITUDE", "LATITUDE", "FLOW_SUM", "SCENE", "flow_per_user"]
+        geo = chunk[geo_cols].dropna(how="any")
+        if not geo.empty:
+            geo = geo.sample(n=min(3000, len(geo)), random_state=7 + idx)
+            geo_sample_df = append_sample(geo_sample_df, geo, MAX_GEO_SAMPLE, seed=200 + idx)
 
-        df["DATE"] = df["DATETIME_KEY"].str.slice(0, 10)
         daily = (
-            df.groupby("DATE", as_index=False)[["FLOW_SUM", "USER_COUNT"]]
+            chunk.groupby(COL_DATE, as_index=False)[["FLOW_SUM", "USER_COUNT"]]
             .sum(min_count=1)
             .rename(columns={"FLOW_SUM": "flow_sum", "USER_COUNT": "user_sum"})
         )
-        if daily_agg is None:
-            daily_agg = daily
-        else:
-            daily_agg = (
-                daily_agg.set_index("DATE")
-                .add(daily.set_index("DATE"), fill_value=0)
-                .reset_index()
-            )
+        daily_agg = combine_sum(daily_agg, daily.set_index(COL_DATE))
 
-        df["flow_sq"] = df["FLOW_SUM"] ** 2
-        df["user_sq"] = df["USER_COUNT"] ** 2
-        df["silent"] = (df["FLOW_SUM"].fillna(0) == 0) & (df["USER_COUNT"] > 0)
+        hourly = chunk.groupby(COL_HOUR).agg(
+            flow_sum=("FLOW_SUM", "sum"),
+            flow_count=("FLOW_SUM", "count"),
+            user_sum=("USER_COUNT", "sum"),
+            user_count=("USER_COUNT", "count"),
+        )
+        hourly_agg = combine_sum(hourly_agg, hourly)
 
-        grp = df.groupby("CELL_ID").agg(
+        weekday = chunk.groupby(COL_WEEKDAY).agg(
+            flow_sum=("FLOW_SUM", "sum"),
+            flow_count=("FLOW_SUM", "count"),
+            user_sum=("USER_COUNT", "sum"),
+            user_count=("USER_COUNT", "count"),
+        )
+        weekday_agg = combine_sum(weekday_agg, weekday)
+
+        holiday_hour = chunk.groupby([COL_HOLIDAY, COL_HOUR]).agg(
+            flow_sum=("FLOW_SUM", "sum"),
+            flow_count=("FLOW_SUM", "count"),
+            user_sum=("USER_COUNT", "sum"),
+            user_count=("USER_COUNT", "count"),
+        )
+        holiday_hour_agg = combine_sum(holiday_hour_agg, holiday_hour)
+
+        heatmap = chunk.groupby([COL_WEEKDAY, COL_HOUR]).agg(
+            flow_sum=("FLOW_SUM", "sum"),
+            flow_count=("FLOW_SUM", "count"),
+            user_sum=("USER_COUNT", "sum"),
+            user_count=("USER_COUNT", "count"),
+        )
+        heatmap_agg = combine_sum(heatmap_agg, heatmap)
+
+        scene = chunk.groupby("SCENE").agg(
+            flow_sum=("FLOW_SUM", "sum"),
+            flow_count=("FLOW_SUM", "count"),
+            user_sum=("USER_COUNT", "sum"),
+            user_count=("USER_COUNT", "count"),
+            activity_sum=("ActivityScore", "sum"),
+            activity_count=("ActivityScore", "count"),
+            par_sum=("PAR", "sum"),
+            par_count=("PAR", "count"),
+        )
+        scene_agg = combine_sum(scene_agg, scene)
+
+        type_df = chunk.groupby("TYPE").agg(
+            flow_sum=("FLOW_SUM", "sum"),
+            flow_count=("FLOW_SUM", "count"),
+            user_sum=("USER_COUNT", "sum"),
+            user_count=("USER_COUNT", "count"),
+            activity_sum=("ActivityScore", "sum"),
+            activity_count=("ActivityScore", "count"),
+            par_sum=("PAR", "sum"),
+            par_count=("PAR", "count"),
+        )
+        type_agg = combine_sum(type_agg, type_df)
+
+        chunk["flow_sq"] = chunk["FLOW_SUM"] ** 2
+        chunk["user_sq"] = chunk["USER_COUNT"] ** 2
+        chunk["silent"] = (chunk["FLOW_SUM"].fillna(0) == 0) & (chunk["USER_COUNT"] > 0)
+
+        cell_stats = chunk.groupby("CELL_ID").agg(
             flow_sum=("FLOW_SUM", "sum"),
             user_sum=("USER_COUNT", "sum"),
             flow_sumsq=("flow_sq", "sum"),
@@ -157,13 +305,55 @@ def main() -> None:
             user_max=("USER_COUNT", "max"),
             silent_count=("silent", "sum"),
             record_count=("CELL_ID", "size"),
+            activity_sum=("ActivityScore", "sum"),
+            activity_count=("ActivityScore", "count"),
+            par_sum=("PAR", "sum"),
+            par_count=("PAR", "count"),
         )
-        cell_agg = combine_cell_agg(cell_agg, grp)
 
-    sample_df = pd.concat(samples, ignore_index=True) if samples else pd.DataFrame()
-    daily_agg = daily_agg.sort_values("DATE")
+        cell_agg = combine_cell_agg(
+            cell_agg,
+            cell_stats,
+            sum_cols=[
+                "flow_sum",
+                "user_sum",
+                "flow_sumsq",
+                "user_sumsq",
+                "flow_count",
+                "user_count",
+                "silent_count",
+                "record_count",
+                "activity_sum",
+                "activity_count",
+                "par_sum",
+                "par_count",
+            ],
+            max_cols=["flow_max", "user_max"],
+        )
 
-    cell_agg = cell_agg.reset_index().merge(attrs, on="CELL_ID", how="left")
+        attrs = chunk[["CELL_ID", "LATITUDE", "LONGITUDE", "TYPE", "SCENE"]].drop_duplicates(
+            subset=["CELL_ID"]
+        )
+        if cell_attrs is None:
+            cell_attrs = attrs
+        else:
+            cell_attrs = pd.concat([cell_attrs, attrs], ignore_index=True).drop_duplicates(
+                subset=["CELL_ID"], keep="first"
+            )
+
+    if sample_df is None:
+        sample_df = pd.DataFrame()
+    if geo_sample_df is None:
+        geo_sample_df = pd.DataFrame()
+
+    daily_agg = daily_agg.reset_index().rename(columns={COL_DATE: "date"})
+    daily_agg["date"] = pd.to_datetime(daily_agg["date"], errors="coerce")
+    daily_agg = daily_agg.sort_values("date")
+
+    cell_agg = cell_agg.reset_index()
+    if cell_attrs is not None:
+        cell_agg = cell_agg.merge(cell_attrs, on="CELL_ID", how="left")
+
     cell_agg["flow_mean"] = cell_agg["flow_sum"] / cell_agg["flow_count"].replace(0, np.nan)
     cell_agg["user_mean"] = cell_agg["user_sum"] / cell_agg["user_count"].replace(0, np.nan)
     cell_agg["flow_var"] = (
@@ -178,16 +368,17 @@ def main() -> None:
     cell_agg["user_std"] = np.sqrt(np.maximum(cell_agg["user_var"], 0))
     cell_agg["flow_cv"] = cell_agg["flow_std"] / cell_agg["flow_mean"]
     cell_agg["user_cv"] = cell_agg["user_std"] / cell_agg["user_mean"]
-    cell_agg["flow_per_user"] = cell_agg["flow_sum"] / cell_agg["user_sum"].replace(
-        0, np.nan
-    )
+    cell_agg["flow_per_user"] = cell_agg["flow_sum"] / cell_agg["user_sum"].replace(0, np.nan)
     cell_agg["peak_ratio"] = cell_agg["flow_max"] / cell_agg["flow_mean"]
-    cell_agg["silent_ratio"] = cell_agg["silent_count"] / cell_agg["record_count"].replace(
-        0, np.nan
-    )
+    cell_agg["silent_ratio"] = cell_agg["silent_count"] / cell_agg["record_count"].replace(0, np.nan)
+    cell_agg["activity_mean"] = cell_agg["activity_sum"] / cell_agg["activity_count"].replace(0, np.nan)
+    cell_agg["par_mean"] = cell_agg["par_sum"] / cell_agg["par_count"].replace(0, np.nan)
 
     flow_global = summarize_global(flow_stats)
     user_global = summarize_global(user_stats)
+    fpu_global = summarize_global(fpu_stats)
+    par_global = summarize_global(par_stats)
+    activity_global = summarize_global(activity_stats)
 
     high_load_threshold = cell_agg["flow_sum"].quantile(0.99)
     silent_threshold = 0.5
@@ -202,13 +393,13 @@ def main() -> None:
     if not sample_df.empty:
         fig, axes = plt.subplots(1, 2, figsize=(12, 4))
         sns.histplot(np.log1p(sample_df["FLOW_SUM"].dropna()), bins=60, ax=axes[0])
-        axes[0].set_title("业务流量分布（log1p）")
-        axes[0].set_xlabel("log(1+业务流量)")
-        axes[0].set_ylabel("样本数量")
+        axes[0].set_title("\u4e1a\u52a1\u6d41\u91cf\u5206\u5e03\uff08log1p\uff09")
+        axes[0].set_xlabel("log(1+\u4e1a\u52a1\u6d41\u91cf)")
+        axes[0].set_ylabel("\u6837\u672c\u6570\u91cf")
         sns.histplot(np.log1p(sample_df["USER_COUNT"].dropna()), bins=60, ax=axes[1])
-        axes[1].set_title("用户数分布（log1p）")
-        axes[1].set_xlabel("log(1+用户数)")
-        axes[1].set_ylabel("样本数量")
+        axes[1].set_title("\u7528\u6237\u6570\u5206\u5e03\uff08log1p\uff09")
+        axes[1].set_xlabel("log(1+\u7528\u6237\u6570)")
+        axes[1].set_ylabel("\u6837\u672c\u6570\u91cf")
         save_fig("fig01_flow_user_hist.png")
 
         fig, axes = plt.subplots(1, 2, figsize=(10, 4))
@@ -217,15 +408,15 @@ def main() -> None:
             ax=axes[0],
             color="#4C78A8",
         )
-        axes[0].set_title("业务流量箱线图（log1p）")
-        axes[0].set_ylabel("log(1+业务流量)")
+        axes[0].set_title("\u4e1a\u52a1\u6d41\u91cf\u7bb1\u7ebf\u56fe\uff08log1p\uff09")
+        axes[0].set_ylabel("log(1+\u4e1a\u52a1\u6d41\u91cf)")
         sns.boxplot(
             y=np.log1p(sample_df["USER_COUNT"].dropna()),
             ax=axes[1],
             color="#F58518",
         )
-        axes[1].set_title("用户数箱线图（log1p）")
-        axes[1].set_ylabel("log(1+用户数)")
+        axes[1].set_title("\u7528\u6237\u6570\u7bb1\u7ebf\u56fe\uff08log1p\uff09")
+        axes[1].set_ylabel("log(1+\u7528\u6237\u6570)")
         save_fig("fig02_flow_user_box.png")
 
         plt.figure(figsize=(6, 5))
@@ -237,109 +428,256 @@ def main() -> None:
         )
         plt.xscale("log")
         plt.yscale("log")
-        plt.title("业务流量-用户数散点（log-log）")
-        plt.xlabel("用户数")
-        plt.ylabel("业务流量（MB）")
+        plt.title("\u4e1a\u52a1\u6d41\u91cf-\u7528\u6237\u6570\u6563\u70b9\uff08log-log\uff09")
+        plt.xlabel("\u7528\u6237\u6570")
+        plt.ylabel("\u4e1a\u52a1\u6d41\u91cf\uff08MB\uff09")
         save_fig("fig03_flow_user_scatter.png")
 
+        plt.figure(figsize=(8, 4))
+        sns.histplot(sample_df["flow_per_user"].dropna(), bins=60, color="#72B7B2")
+        plt.title("\u4eba\u5747\u6d41\u91cf\u5206\u5e03")
+        plt.xlabel("\u4eba\u5747\u6d41\u91cf\uff08MB/\u4eba\uff09")
+        plt.ylabel("\u6837\u672c\u6570\u91cf")
+        save_fig("fig24_flow_per_user_hist.png")
+
+        plt.figure(figsize=(8, 4))
+        sns.histplot(sample_df["PAR"].dropna(), bins=60, color="#E45756")
+        plt.title("PAR \u5206\u5e03")
+        plt.xlabel("PAR")
+        plt.ylabel("\u6837\u672c\u6570\u91cf")
+        save_fig("fig22_par_hist.png")
+
+        plt.figure(figsize=(8, 4))
+        sns.histplot(sample_df["ActivityScore"].dropna(), bins=60, color="#54A24B")
+        plt.title("\u6d3b\u8dc3\u5ea6\u8bc4\u5206\u5206\u5e03")
+        plt.xlabel("ActivityScore")
+        plt.ylabel("\u6837\u672c\u6570\u91cf")
+        save_fig("fig21_activityscore_hist.png")
+
     plt.figure(figsize=(10, 4))
-    plt.plot(daily_agg["DATE"], daily_agg["flow_sum"])
+    plt.plot(daily_agg["date"], daily_agg["flow_sum"])
     plt.xticks(rotation=45)
-    plt.title("全网日总流量走势")
-    plt.xlabel("日期")
-    plt.ylabel("业务流量（MB）")
+    plt.title("\u5168\u7f51\u65e5\u603b\u6d41\u91cf\u8d70\u52bf")
+    plt.xlabel("\u65e5\u671f")
+    plt.ylabel("\u4e1a\u52a1\u6d41\u91cf\uff08MB\uff09")
     save_fig("fig04_daily_total_flow.png")
 
     plt.figure(figsize=(10, 4))
-    plt.plot(daily_agg["DATE"], daily_agg["user_sum"])
+    plt.plot(daily_agg["date"], daily_agg["user_sum"])
     plt.xticks(rotation=45)
-    plt.title("全网日总用户数走势")
-    plt.xlabel("日期")
-    plt.ylabel("用户数")
+    plt.title("\u5168\u7f51\u65e5\u603b\u7528\u6237\u6570\u8d70\u52bf")
+    plt.xlabel("\u65e5\u671f")
+    plt.ylabel("\u7528\u6237\u6570")
     save_fig("fig05_daily_total_user.png")
 
-    top10_flow = cell_agg.sort_values("flow_sum", ascending=False).head(10)
-    top10_flow_labels = (
-        top10_flow["CELL_ID"].astype(str)
-        + " | 场景"
-        + top10_flow["SCENE"].fillna(-1).astype(int).astype(str)
-    )
-    plt.figure(figsize=(10, 4))
-    sns.barplot(x=top10_flow_labels, y=top10_flow["flow_sum"], color="#4C78A8")
-    plt.title("TOP10 小区总流量")
-    plt.xlabel("小区ID | 场景")
-    plt.ylabel("业务流量（MB）")
-    plt.xticks(rotation=30, ha="right")
-    save_fig("fig06_top10_flow.png")
+    hourly_agg = hourly_agg.reindex(range(24)).fillna(0)
+    hourly_agg["flow_mean"] = hourly_agg["flow_sum"] / hourly_agg["flow_count"].replace(0, np.nan)
+    hourly_agg["user_mean"] = hourly_agg["user_sum"] / hourly_agg["user_count"].replace(0, np.nan)
 
-    top10_fpu = cell_agg.sort_values("flow_per_user", ascending=False).head(10)
-    top10_fpu_labels = (
-        top10_fpu["CELL_ID"].astype(str)
-        + " | 场景"
-        + top10_fpu["SCENE"].fillna(-1).astype(int).astype(str)
-    )
     plt.figure(figsize=(10, 4))
-    sns.barplot(x=top10_fpu_labels, y=top10_fpu["flow_per_user"], color="#E45756")
-    plt.title("TOP10 人均流量")
-    plt.xlabel("小区ID | 场景")
-    plt.ylabel("人均流量（MB/人）")
-    plt.xticks(rotation=30, ha="right")
-    save_fig("fig07_top10_flow_per_user.png")
+    plt.plot(hourly_agg.index, hourly_agg["flow_mean"], marker="o")
+    plt.title("\u5c0f\u65f6\u7ef4\u5ea6\u5e73\u5747\u6d41\u91cf")
+    plt.xlabel("\u5c0f\u65f6")
+    plt.ylabel("\u5e73\u5747\u6d41\u91cf\uff08MB\uff09")
+    save_fig("fig06_hourly_mean_flow.png")
+
+    plt.figure(figsize=(10, 4))
+    plt.plot(hourly_agg.index, hourly_agg["user_mean"], marker="o", color="#F58518")
+    plt.title("\u5c0f\u65f6\u7ef4\u5ea6\u5e73\u5747\u7528\u6237\u6570")
+    plt.xlabel("\u5c0f\u65f6")
+    plt.ylabel("\u5e73\u5747\u7528\u6237\u6570")
+    save_fig("fig07_hourly_mean_user.png")
+
+    weekday_agg = weekday_agg.reindex(range(7)).fillna(0)
+    weekday_agg["flow_mean"] = weekday_agg["flow_sum"] / weekday_agg["flow_count"].replace(0, np.nan)
+    weekday_agg["user_mean"] = weekday_agg["user_sum"] / weekday_agg["user_count"].replace(0, np.nan)
+    weekday_names = weekday_labels(list(weekday_agg.index))
+
+    plt.figure(figsize=(8, 4))
+    sns.barplot(x=weekday_names, y=weekday_agg["flow_mean"], color="#4C78A8")
+    plt.title("\u661f\u671f\u7ef4\u5ea6\u5e73\u5747\u6d41\u91cf")
+    plt.xlabel("\u661f\u671f")
+    plt.ylabel("\u5e73\u5747\u6d41\u91cf\uff08MB\uff09")
+    save_fig("fig08_weekday_mean_flow.png")
+
+    plt.figure(figsize=(8, 4))
+    sns.barplot(x=weekday_names, y=weekday_agg["user_mean"], color="#F58518")
+    plt.title("\u661f\u671f\u7ef4\u5ea6\u5e73\u5747\u7528\u6237\u6570")
+    plt.xlabel("\u661f\u671f")
+    plt.ylabel("\u5e73\u5747\u7528\u6237\u6570")
+    save_fig("fig09_weekday_mean_user.png")
+
+    holiday_hour_agg = holiday_hour_agg.reset_index()
+    holiday_hour_agg["flow_mean"] = holiday_hour_agg["flow_sum"] / holiday_hour_agg["flow_count"].replace(0, np.nan)
+    holiday_hour_agg["user_mean"] = holiday_hour_agg["user_sum"] / holiday_hour_agg["user_count"].replace(0, np.nan)
+
+    plt.figure(figsize=(10, 4))
+    for flag, label in [(0, "\u5de5\u4f5c\u65e5"), (1, "\u8282\u5047\u65e5")]:
+        subset = holiday_hour_agg[holiday_hour_agg[COL_HOLIDAY] == flag]
+        subset = subset.set_index(COL_HOUR).reindex(range(24)).fillna(0)
+        plt.plot(subset.index, subset["flow_mean"], marker="o", label=label)
+    plt.title("\u8282\u5047\u65e5\u4e0e\u5de5\u4f5c\u65e5\u7684\u5c0f\u65f6\u6d41\u91cf\u5bf9\u6bd4")
+    plt.xlabel("\u5c0f\u65f6")
+    plt.ylabel("\u5e73\u5747\u6d41\u91cf\uff08MB\uff09")
+    plt.legend()
+    save_fig("fig25_hourly_holiday_flow.png")
+
+    plt.figure(figsize=(10, 4))
+    for flag, label in [(0, "\u5de5\u4f5c\u65e5"), (1, "\u8282\u5047\u65e5")]:
+        subset = holiday_hour_agg[holiday_hour_agg[COL_HOLIDAY] == flag]
+        subset = subset.set_index(COL_HOUR).reindex(range(24)).fillna(0)
+        plt.plot(subset.index, subset["user_mean"], marker="o", label=label)
+    plt.title("\u8282\u5047\u65e5\u4e0e\u5de5\u4f5c\u65e5\u7684\u5c0f\u65f6\u7528\u6237\u6570\u5bf9\u6bd4")
+    plt.xlabel("\u5c0f\u65f6")
+    plt.ylabel("\u5e73\u5747\u7528\u6237\u6570")
+    plt.legend()
+    save_fig("fig26_hourly_holiday_user.png")
+
+    heatmap_agg = heatmap_agg.reset_index()
+    heatmap_agg["flow_mean"] = heatmap_agg["flow_sum"] / heatmap_agg["flow_count"].replace(0, np.nan)
+    heatmap_agg["user_mean"] = heatmap_agg["user_sum"] / heatmap_agg["user_count"].replace(0, np.nan)
+
+    heat_flow = heatmap_agg.pivot(index=COL_WEEKDAY, columns=COL_HOUR, values="flow_mean").reindex(index=range(7), columns=range(24))
+    heat_user = heatmap_agg.pivot(index=COL_WEEKDAY, columns=COL_HOUR, values="user_mean").reindex(index=range(7), columns=range(24))
+
+    plt.figure(figsize=(12, 4))
+    sns.heatmap(heat_flow, cmap="YlOrRd")
+    plt.title("\u5c0f\u65f6-\u661f\u671f\u7ef4\u5ea6\u6d41\u91cf\u70ed\u529b\u56fe")
+    plt.xlabel("\u5c0f\u65f6")
+    plt.ylabel("\u661f\u671f")
+    plt.yticks(ticks=np.arange(0.5, 7.5, 1.0), labels=weekday_labels(list(range(7))))
+    save_fig("fig15_hour_weekday_heatmap_flow.png")
+
+    plt.figure(figsize=(12, 4))
+    sns.heatmap(heat_user, cmap="YlGnBu")
+    plt.title("\u5c0f\u65f6-\u661f\u671f\u7ef4\u5ea6\u7528\u6237\u6570\u70ed\u529b\u56fe")
+    plt.xlabel("\u5c0f\u65f6")
+    plt.ylabel("\u661f\u671f")
+    plt.yticks(ticks=np.arange(0.5, 7.5, 1.0), labels=weekday_labels(list(range(7))))
+    save_fig("fig16_hour_weekday_heatmap_user.png")
+
+    scene_agg["flow_mean"] = scene_agg["flow_sum"] / scene_agg["flow_count"].replace(0, np.nan)
+    scene_agg["user_mean"] = scene_agg["user_sum"] / scene_agg["user_count"].replace(0, np.nan)
+    scene_top = scene_agg.sort_values("flow_sum", ascending=False).head(10)
+
+    plt.figure(figsize=(10, 4))
+    sns.barplot(x=scene_top.index.astype(int).astype(str), y=scene_top["flow_sum"], color="#4C78A8")
+    plt.title("\u573a\u666f\u603b\u6d41\u91cf TOP10")
+    plt.xlabel("\u573a\u666f\uff08SCENE\uff09")
+    plt.ylabel("\u603b\u6d41\u91cf\uff08MB\uff09")
+    save_fig("fig12_scene_flow_share.png")
 
     scene_counts = cell_agg["SCENE"].value_counts().head(10).index
     scene_df = cell_agg[cell_agg["SCENE"].isin(scene_counts)]
 
     plt.figure(figsize=(10, 4))
     sns.boxplot(x="SCENE", y="flow_mean", data=scene_df, color="#72B7B2")
-    plt.title("不同场景的小区平均流量分布")
-    plt.xlabel("场景（SCENE）")
-    plt.ylabel("平均流量（MB）")
-    save_fig("fig08_scene_flow_box.png")
+    plt.title("\u4e0d\u540c\u573a\u666f\u7684\u5c0f\u533a\u5e73\u5747\u6d41\u91cf\u5206\u5e03")
+    plt.xlabel("\u573a\u666f\uff08SCENE\uff09")
+    plt.ylabel("\u5e73\u5747\u6d41\u91cf\uff08MB\uff09")
+    save_fig("fig10_scene_flow_box.png")
 
     plt.figure(figsize=(10, 4))
     sns.boxplot(x="SCENE", y="user_mean", data=scene_df, color="#54A24B")
-    plt.title("不同场景的小区平均用户数分布")
-    plt.xlabel("场景（SCENE）")
-    plt.ylabel("平均用户数")
-    save_fig("fig09_scene_user_box.png")
+    plt.title("\u4e0d\u540c\u573a\u666f\u7684\u5c0f\u533a\u5e73\u5747\u7528\u6237\u6570\u5206\u5e03")
+    plt.xlabel("\u573a\u666f\uff08SCENE\uff09")
+    plt.ylabel("\u5e73\u5747\u7528\u6237\u6570")
+    save_fig("fig11_scene_user_box.png")
+
+    type_agg["flow_mean"] = type_agg["flow_sum"] / type_agg["flow_count"].replace(0, np.nan)
+    type_agg["user_mean"] = type_agg["user_sum"] / type_agg["user_count"].replace(0, np.nan)
+
+    plt.figure(figsize=(8, 4))
+    sns.barplot(x=type_agg.index.astype(int).astype(str), y=type_agg["flow_mean"], color="#9D755D")
+    plt.title("\u4e0d\u540c TYPE \u7684\u5e73\u5747\u6d41\u91cf")
+    plt.xlabel("TYPE")
+    plt.ylabel("\u5e73\u5747\u6d41\u91cf\uff08MB\uff09")
+    save_fig("fig13_type_flow_bar.png")
+
+    plt.figure(figsize=(8, 4))
+    sns.barplot(x=type_agg.index.astype(int).astype(str), y=type_agg["user_mean"], color="#F28E2B")
+    plt.title("\u4e0d\u540c TYPE \u7684\u5e73\u5747\u7528\u6237\u6570")
+    plt.xlabel("TYPE")
+    plt.ylabel("\u5e73\u5747\u7528\u6237\u6570")
+    save_fig("fig14_type_user_bar.png")
+
+    top10_flow = cell_agg.sort_values("flow_sum", ascending=False).head(10)
+    top10_flow_labels = (
+        top10_flow["CELL_ID"].astype(str)
+        + " | \u573a\u666f"
+        + top10_flow["SCENE"].fillna(-1).astype(int).astype(str)
+    )
+    plt.figure(figsize=(10, 4))
+    sns.barplot(x=top10_flow_labels, y=top10_flow["flow_sum"], color="#4C78A8")
+    plt.title("TOP10 \u5c0f\u533a\u603b\u6d41\u91cf")
+    plt.xlabel("\u5c0f\u533aID | \u573a\u666f")
+    plt.ylabel("\u4e1a\u52a1\u6d41\u91cf\uff08MB\uff09")
+    plt.xticks(rotation=30, ha="right")
+    save_fig("fig17_top10_flow.png")
+
+    top10_fpu = cell_agg.sort_values("flow_per_user", ascending=False).head(10)
+    top10_fpu_labels = (
+        top10_fpu["CELL_ID"].astype(str)
+        + " | \u573a\u666f"
+        + top10_fpu["SCENE"].fillna(-1).astype(int).astype(str)
+    )
+    plt.figure(figsize=(10, 4))
+    sns.barplot(x=top10_fpu_labels, y=top10_fpu["flow_per_user"], color="#E45756")
+    plt.title("TOP10 \u4eba\u5747\u6d41\u91cf")
+    plt.xlabel("\u5c0f\u533aID | \u573a\u666f")
+    plt.ylabel("\u4eba\u5747\u6d41\u91cf\uff08MB/\u4eba\uff09")
+    plt.xticks(rotation=30, ha="right")
+    save_fig("fig18_top10_flow_per_user.png")
 
     plt.figure(figsize=(8, 4))
     sns.histplot(cell_agg["silent_ratio"].dropna(), bins=40, color="#B279A2")
-    plt.title("小区静默比例分布")
-    plt.xlabel("静默比例（有用户无流量）")
-    plt.ylabel("小区数量")
-    save_fig("fig10_silent_ratio_hist.png")
+    plt.title("\u5c0f\u533a\u9759\u9ed8\u6bd4\u4f8b\u5206\u5e03")
+    plt.xlabel("\u9759\u9ed8\u6bd4\u4f8b\uff08\u6709\u7528\u6237\u65e0\u6d41\u91cf\uff09")
+    plt.ylabel("\u5c0f\u533a\u6570\u91cf")
+    save_fig("fig19_silent_ratio_hist.png")
 
     if not silent_cells.empty:
-        silent_scene = (
-            silent_cells["SCENE"].value_counts().sort_values(ascending=False)
-        )
+        silent_scene = silent_cells["SCENE"].value_counts().sort_values(ascending=False)
         plt.figure(figsize=(8, 4))
-        sns.barplot(
-            x=silent_scene.index.astype(str), y=silent_scene.values, color="#FF9DA6"
-        )
-        plt.title("静默小区数量（按场景）")
-        plt.xlabel("场景（SCENE）")
-        plt.ylabel("静默小区数量")
-        save_fig("fig11_silent_scene.png")
+        sns.barplot(x=silent_scene.index.astype(int).astype(str), y=silent_scene.values, color="#FF9DA6")
+        plt.title("\u9759\u9ed8\u5c0f\u533a\u6570\u91cf\uff08\u6309\u573a\u666f\uff09")
+        plt.xlabel("\u573a\u666f\uff08SCENE\uff09")
+        plt.ylabel("\u9759\u9ed8\u5c0f\u533a\u6570\u91cf")
+        save_fig("fig20_silent_scene.png")
 
     if not high_load_cells.empty:
-        high_scene = (
-            high_load_cells["SCENE"].value_counts().sort_values(ascending=False)
-        )
+        high_scene = high_load_cells["SCENE"].value_counts().sort_values(ascending=False)
         plt.figure(figsize=(8, 4))
-        sns.barplot(
-            x=high_scene.index.astype(str), y=high_scene.values, color="#F28E2B"
+        sns.barplot(x=high_scene.index.astype(int).astype(str), y=high_scene.values, color="#F28E2B")
+        plt.title("\u9ad8\u8d1f\u8377\u5c0f\u533a\u6570\u91cf\uff08\u6309\u573a\u666f\uff09")
+        plt.xlabel("\u573a\u666f\uff08SCENE\uff09")
+        plt.ylabel("\u9ad8\u8d1f\u8377\u5c0f\u533a\u6570\u91cf")
+        save_fig("fig21_highload_scene.png")
+
+    if not geo_sample_df.empty:
+        plt.figure(figsize=(6, 6))
+        sizes = np.log1p(geo_sample_df["FLOW_SUM"].clip(lower=0)) * 8
+        plt.scatter(
+            geo_sample_df["LONGITUDE"],
+            geo_sample_df["LATITUDE"],
+            s=sizes,
+            c=geo_sample_df["flow_per_user"],
+            cmap="viridis",
+            alpha=0.4,
         )
-        plt.title("高负荷小区数量（按场景）")
-        plt.xlabel("场景（SCENE）")
-        plt.ylabel("高负荷小区数量")
-        save_fig("fig12_highload_scene.png")
+        plt.colorbar(label="\u4eba\u5747\u6d41\u91cf\uff08MB/\u4eba\uff09")
+        plt.title("\u7ecf\u7eac\u5ea6\u6ce1\u6ce1\u56fe\uff08\u5927\u5c0f=\u6d41\u91cf\uff0c\u989c\u8272=\u4eba\u5747\u6d41\u91cf\uff09")
+        plt.xlabel("\u7ecf\u5ea6")
+        plt.ylabel("\u7eac\u5ea6")
+        save_fig("fig27_geo_bubble_flow.png")
 
     stats_out = {
         "global": {
             "flow": flow_global,
             "user": user_global,
+            "flow_per_user": fpu_global,
+            "par": par_global,
+            "activity": activity_global,
         },
         "cells": {
             "total_cells": int(cell_agg.shape[0]),
@@ -349,15 +687,18 @@ def main() -> None:
             "high_load_cells": int(high_load_cells.shape[0]),
         },
         "derived_metrics": {
-            "flow_mean": "小区平均业务流量 = flow_sum / flow_count",
-            "user_mean": "小区平均用户数 = user_sum / user_count",
-            "flow_per_user": "人均流量 = flow_sum / user_sum",
-            "flow_cv": "流量变异系数 = flow_std / flow_mean",
-            "silent_ratio": "静默比例 = silent_count / record_count",
-            "peak_ratio": "峰均比 = flow_max / flow_mean",
+            "flow_mean": "\u5c0f\u533a\u5e73\u5747\u4e1a\u52a1\u6d41\u91cf = flow_sum / flow_count",
+            "user_mean": "\u5c0f\u533a\u5e73\u5747\u7528\u6237\u6570 = user_sum / user_count",
+            "flow_per_user": "\u4eba\u5747\u6d41\u91cf = flow_sum / user_sum",
+            "flow_cv": "\u6d41\u91cf\u53d8\u5f02\u7cfb\u6570 = flow_std / flow_mean",
+            "silent_ratio": "\u9759\u9ed8\u6bd4\u4f8b = silent_count / record_count",
+            "peak_ratio": "\u5cf0\u5747\u6bd4 = flow_max / flow_mean",
+            "activity_mean": "\u6d3b\u8dc3\u5ea6\u5747\u503c = activity_sum / activity_count",
+            "par_mean": "PAR \u5747\u503c = par_sum / par_count",
         },
-        "top10_flow": top10_flow[["CELL_ID", "flow_sum", "SCENE", "TYPE"]]
-        .to_dict(orient="records"),
+        "top10_flow": top10_flow[["CELL_ID", "flow_sum", "SCENE", "TYPE"]].to_dict(
+            orient="records"
+        ),
         "top10_flow_per_user": top10_fpu[
             ["CELL_ID", "flow_per_user", "SCENE", "TYPE"]
         ].to_dict(orient="records"),

@@ -1,27 +1,51 @@
 {
   "global": {
     "flow": {
-      "count": 90565791,
-      "mean": 956.5719817541261,
-      "var": 2311216.258727676,
-      "std": 1520.2684824489638,
+      "count": 93850560,
+      "mean": 956.5731187965208,
+      "var": 2231028.237631073,
+      "std": 1493.6626920530196,
       "min": 0.0,
       "max": 329743.90625
     },
     "user": {
-      "count": 90565791,
-      "mean": 269.1196258861141,
-      "var": 160349.51248515674,
-      "std": 400.43665227493443,
+      "count": 93850560,
+      "mean": 269.1197561740708,
+      "var": 154902.6690451535,
+      "std": 393.57676385319485,
       "min": 0.0,
       "max": 15925.0
+    },
+    "flow_per_user": {
+      "count": 93488836,
+      "mean": 6.298272753123165,
+      "var": 326.40521269114004,
+      "std": 18.066687928094073,
+      "min": 0.0,
+      "max": 7050.7099609375
+    },
+    "par": {
+      "count": 93850560,
+      "mean": 4.775862077967356,
+      "var": 13.368216285308137,
+      "std": 3.6562571415736254,
+      "min": 1.2743250131607056,
+      "max": 104.90887451171875
+    },
+    "activity": {
+      "count": 93850560,
+      "mean": 0.009900078540171338,
+      "var": 0.0001903145337705701,
+      "std": 0.013795453373143272,
+      "min": 0.0,
+      "max": 0.5418946146965027
     }
   },
   "cells": {
     "total_cells": 65174,
     "silent_threshold": 0.5,
     "silent_cells": 6,
-    "high_load_threshold": 6044390.209999987,
+    "high_load_threshold": 6093868.3199999975,
     "high_load_cells": 652
   },
   "derived_metrics": {
@@ -30,130 +54,132 @@
     "flow_per_user": "人均流量 = flow_sum / user_sum",
     "flow_cv": "流量变异系数 = flow_std / flow_mean",
     "silent_ratio": "静默比例 = silent_count / record_count",
-    "peak_ratio": "峰均比 = flow_max / flow_mean"
+    "peak_ratio": "峰均比 = flow_max / flow_mean",
+    "activity_mean": "活跃度均值 = activity_sum / activity_count",
+    "par_mean": "PAR 均值 = par_sum / par_count"
   },
   "top10_flow": [
     {
       "CELL_ID": 621,
-      "flow_sum": 24841324.0,
-      "SCENE": 2,
-      "TYPE": 1
+      "flow_sum": 24892078.0,
+      "SCENE": 2.0,
+      "TYPE": 1.0
     },
     {
       "CELL_ID": 39033,
-      "flow_sum": 22768286.0,
-      "SCENE": 2,
-      "TYPE": 1
+      "flow_sum": 22819772.0,
+      "SCENE": 2.0,
+      "TYPE": 1.0
     },
     {
       "CELL_ID": 620,
-      "flow_sum": 21292742.0,
-      "SCENE": 2,
-      "TYPE": 1
+      "flow_sum": 21360752.0,
+      "SCENE": 2.0,
+      "TYPE": 1.0
     },
     {
       "CELL_ID": 59748,
-      "flow_sum": 20761956.0,
-      "SCENE": 18,
-      "TYPE": 1
+      "flow_sum": 20811314.0,
+      "SCENE": 18.0,
+      "TYPE": 1.0
     },
     {
       "CELL_ID": 29982,
-      "flow_sum": 18876674.0,
-      "SCENE": 15,
-      "TYPE": 0
+      "flow_sum": 18929068.0,
+      "SCENE": 15.0,
+      "TYPE": 0.0
     },
     {
       "CELL_ID": 29983,
-      "flow_sum": 17109736.0,
-      "SCENE": 15,
-      "TYPE": 0
+      "flow_sum": 17176422.0,
+      "SCENE": 15.0,
+      "TYPE": 0.0
     },
     {
       "CELL_ID": 25630,
-      "flow_sum": 16823680.0,
-      "SCENE": 16,
-      "TYPE": 1
+      "flow_sum": 16865364.0,
+      "SCENE": 16.0,
+      "TYPE": 1.0
     },
     {
       "CELL_ID": 31945,
-      "flow_sum": 16771411.0,
-      "SCENE": 0,
-      "TYPE": 0
+      "flow_sum": 16825510.0,
+      "SCENE": 0.0,
+      "TYPE": 0.0
     },
     {
       "CELL_ID": 2821,
-      "flow_sum": 15508914.0,
-      "SCENE": 2,
-      "TYPE": 1
+      "flow_sum": 15552098.0,
+      "SCENE": 2.0,
+      "TYPE": 1.0
     },
     {
       "CELL_ID": 53661,
-      "flow_sum": 14624996.0,
-      "SCENE": 2,
-      "TYPE": 1
+      "flow_sum": 14682115.0,
+      "SCENE": 2.0,
+      "TYPE": 1.0
     }
   ],
   "top10_flow_per_user": [
     {
       "CELL_ID": 16334,
-      "flow_per_user": 83.5252685546875,
-      "SCENE": 5,
-      "TYPE": 0
-    },
-    {
-      "CELL_ID": 23361,
-      "flow_per_user": 72.0267333984375,
-      "SCENE": 16,
-      "TYPE": 1
-    },
-    {
-      "CELL_ID": 16308,
-      "flow_per_user": 61.232723236083984,
-      "SCENE": 5,
-      "TYPE": 0
+      "flow_per_user": 74.29314422607422,
+      "SCENE": 5.0,
+      "TYPE": 0.0
     },
     {
       "CELL_ID": 54676,
-      "flow_per_user": 57.90290451049805,
-      "SCENE": 5,
-      "TYPE": 0
-    },
-    {
-      "CELL_ID": 34900,
-      "flow_per_user": 57.57465362548828,
-      "SCENE": 5,
-      "TYPE": 0
+      "flow_per_user": 55.25054931640625,
+      "SCENE": 5.0,
+      "TYPE": 0.0
     },
     {
       "CELL_ID": 16305,
-      "flow_per_user": 56.510398864746094,
-      "SCENE": 5,
-      "TYPE": 0
-    },
-    {
-      "CELL_ID": 48672,
-      "flow_per_user": 56.15399169921875,
-      "SCENE": 5,
-      "TYPE": 0
+      "flow_per_user": 53.401973724365234,
+      "SCENE": 5.0,
+      "TYPE": 0.0
     },
     {
       "CELL_ID": 16311,
-      "flow_per_user": 54.95570755004883,
-      "SCENE": 5,
-      "TYPE": 0
+      "flow_per_user": 51.91984176635742,
+      "SCENE": 5.0,
+      "TYPE": 0.0
     },
     {
       "CELL_ID": 54688,
-      "flow_per_user": 53.4721565246582,
-      "SCENE": 5,
-      "TYPE": 0
+      "flow_per_user": 50.28590393066406,
+      "SCENE": 5.0,
+      "TYPE": 0.0
     },
     {
       "CELL_ID": 54681,
-      "flow_per_user": 53.429996490478516,
-      "SCENE": 5,
-      "TYPE": 0
+      "flow_per_user": 50.19087219238281,
+      "SCENE": 5.0,
+      "TYPE": 0.0
+    },
+    {
+      "CELL_ID": 16308,
+      "flow_per_user": 49.84407424926758,
+      "SCENE": 5.0,
+      "TYPE": 0.0
+    },
+    {
+      "CELL_ID": 54687,
+      "flow_per_user": 49.740543365478516,
+      "SCENE": 5.0,
+      "TYPE": 0.0
+    },
+    {
+      "CELL_ID": 16310,
+      "flow_per_user": 49.26408386230469,
+      "SCENE": 5.0,
+      "TYPE": 0.0
+    },
+    {
+      "CELL_ID": 54674,
+      "flow_per_user": 47.65144348144531,
+      "SCENE": 5.0,
+      "TYPE": 0.0
     }
   ]
 }
