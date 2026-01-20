@@ -11,17 +11,18 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from sklearn.cluster import KMeans
+from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import PCA
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import (
     calinski_harabasz_score,
     davies_bouldin_score,
     r2_score,
     silhouette_score,
 )
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 
 DATA_PATH = Path("all_final_data_with_attributes.csv")
@@ -372,24 +373,47 @@ def main() -> None:
     plt.title("\u6307\u6807\u76f8\u5173\u6027\u70ed\u529b\u56fe")
     save_fig("fig10_correlation_heatmap.png")
 
-    pred_feature_cols = [
+    pred_feature_num = [
         "user_mean",
         "user_max",
-        "SCENE",
-        "TYPE",
+        "user_std",
+        "user_cv",
+        "activity_mean",
+        "par_mean",
+        "silent_ratio",
+        "flow_cv",
+        "peak_ratio",
+        "flow_per_user",
+        "LATITUDE",
+        "LONGITUDE",
     ]
+    pred_feature_cat = ["SCENE", "TYPE"]
     pred_target = "flow_mean"
-    pred_df = cell_agg[pred_feature_cols + [pred_target]].dropna()
+    pred_df = cell_agg[pred_feature_num + pred_feature_cat + [pred_target]].dropna()
     pred_metrics = None
     if pred_df.shape[0] >= 500:
-        X = pred_df[pred_feature_cols].to_numpy()
+        X = pred_df[pred_feature_num + pred_feature_cat]
         y = pred_df[pred_target].to_numpy()
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42
         )
-        pred_model = make_pipeline(StandardScaler(), LinearRegression())
-        pred_model.fit(X_train, y_train)
-        y_pred = pred_model.predict(X_test)
+        pre = ColumnTransformer(
+            [
+                ("num", StandardScaler(), pred_feature_num),
+                ("cat", OneHotEncoder(handle_unknown="ignore"), pred_feature_cat),
+            ]
+        )
+        pred_model = GradientBoostingRegressor(
+            random_state=42,
+            max_depth=4,
+            learning_rate=0.05,
+            n_estimators=500,
+            subsample=0.9,
+            min_samples_leaf=8,
+        )
+        pred_pipe = make_pipeline(pre, pred_model)
+        pred_pipe.fit(X_train, np.log1p(y_train))
+        y_pred = np.expm1(pred_pipe.predict(X_test))
 
         pred_mae = float(np.mean(np.abs(y_test - y_pred)))
         pred_rmse = float(np.sqrt(np.mean((y_test - y_pred) ** 2)))
@@ -397,7 +421,8 @@ def main() -> None:
         pred_r2 = safe_r2(y_test, y_pred)
         pred_metrics = {
             "target": pred_target,
-            "features": pred_feature_cols,
+            "features_num": pred_feature_num,
+            "features_cat": pred_feature_cat,
             "mae": pred_mae,
             "rmse": pred_rmse,
             "mape": pred_mape,
@@ -420,15 +445,20 @@ def main() -> None:
         )
         save_fig("fig24_flow_mean_pred_scatter.png")
 
-        coef = pred_model.named_steps["linearregression"].coef_
-        coef_series = (
-            pd.Series(coef, index=pred_feature_cols)
-            .sort_values(ascending=True)
-        )
+        feature_names = pred_pipe.named_steps["columntransformer"].get_feature_names_out()
+        importances = pred_pipe.named_steps["gradientboostingregressor"].feature_importances_
+        grouped = {}
+        for name, value in zip(feature_names, importances):
+            if name.startswith("num__"):
+                base = name.replace("num__", "")
+            else:
+                base = name.replace("cat__", "").split("_")[0]
+            grouped[base] = grouped.get(base, 0.0) + float(value)
+        coef_series = pd.Series(grouped).sort_values(ascending=True)
         plt.figure(figsize=(6, 4))
         plt.barh(coef_series.index, coef_series.values, color="#72B7B2")
-        plt.title("\u7279\u5f81\u7cfb\u6570\uff08\u6807\u51c6\u5316\u7ebf\u6027\u56de\u5f52\uff09")
-        plt.xlabel("\u7cfb\u6570\u503c")
+        plt.title("\u7279\u5f81\u91cd\u8981\u6027\uff08\u7ec4\u5408\u7edf\u8ba1\uff09")
+        plt.xlabel("\u91cd\u8981\u6027")
         plt.ylabel("\u6307\u6807")
         save_fig("fig25_flow_mean_pred_features.png")
 

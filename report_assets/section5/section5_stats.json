@@ -53,17 +53,29 @@
   },
   "feature_prediction": {
     "target": "flow_mean",
-    "features": [
+    "features_num": [
       "user_mean",
       "user_max",
+      "user_std",
+      "user_cv",
+      "activity_mean",
+      "par_mean",
+      "silent_ratio",
+      "flow_cv",
+      "peak_ratio",
+      "flow_per_user",
+      "LATITUDE",
+      "LONGITUDE"
+    ],
+    "features_cat": [
       "SCENE",
       "TYPE"
     ],
-    "mae": 444.15376328436946,
-    "rmse": 644.0198862764892,
-    "mape": 1.0654155487012191,
-    "mape_pct": 106.54155487012191,
-    "r2": 0.49063755094663764,
+    "mae": 17.88472140201569,
+    "rmse": 31.68824350688984,
+    "mape": 0.02259823073174678,
+    "mape_pct": 2.2598230731746782,
+    "r2": 0.9987668250256934,
     "test_size": 13035
   }
 }

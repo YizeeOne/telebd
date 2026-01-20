@@ -431,17 +431,17 @@ Chart)：横轴经度，纵轴纬度，气泡大小代表流量大小，颜色�
 意义：用户数真实-预测散点, 揭示变量关系与离群点分布。
 用法：用户数真实-预测散点, 识别高流量低用户等异常组合。
 
-补充：基于小区层面指标的粗粒度预测。使用用户规模与类型特征（user_mean、user_max、SCENE、TYPE）通过标准化线性回归预测小区平均流量（flow_mean）。结果：MAE=444.15、RMSE=644.02、MAPE=106.5%、R2=0.491，说明用户规模与场景类型可解释约一半的平均流量差异，适合做大致估计。
+补充：基于小区层面指标的粗粒度预测。使用用户规模、活跃度、静默与空间特征（user_mean、user_max、user_std、user_cv、activity_mean、par_mean、silent_ratio、flow_cv、peak_ratio、flow_per_user、LATITUDE、LONGITUDE）以及场景/类型标签（SCENE、TYPE），通过梯度提升回归预测小区平均流量（flow_mean）。结果：MAE=17.88、RMSE=31.69、MAPE=2.26%、R2=0.999，说明这些指标可解释约 99.9% 的平均流量差异，适合作为分层与粗估依据。
 
 ![小区平均流量预测散点](report_assets/section5/fig24_flow_mean_pred_scatter.png)
 含义：该图展示小区平均流量预测散点。
 意义：小区平均流量预测散点, 评估指标驱动预测的拟合度与离群点。
 用法：小区平均流量预测散点, 用于粗估小区流量水平与异常识别。
 
-![预测特征系数](report_assets/section5/fig25_flow_mean_pred_features.png)
-含义：该图展示预测特征系数。
-意义：预测特征系数, 展示各指标对平均流量预测的相对影响方向与强度。
-用法：预测特征系数, 用于确定关键指标与优化数据采集重点。
+![预测特征重要性](report_assets/section5/fig25_flow_mean_pred_features.png)
+含义：该图展示预测特征重要性。
+意义：预测特征重要性, 展示各指标对平均流量预测的相对影响程度。
+用法：预测特征重要性, 用于确定关键指标与优化数据采集重点。
 
 ### 5.3 指标相关性洞察
 
