@@ -277,14 +277,19 @@ def main() -> None:
 
     plt.figure(figsize=(6, 6))
     scatter_df = cell_meta.sample(min(3000, len(cell_meta)), random_state=42)
-    plt.scatter(
-        scatter_df["LONGITUDE"],
-        scatter_df["LATITUDE"],
-        c=scatter_df["cluster"],
-        cmap="tab10",
-        s=8,
-        alpha=0.6,
-    )
+    unique_clusters = np.sort(scatter_df["cluster"].unique())
+    colors = plt.cm.tab10(np.linspace(0, 1, len(unique_clusters)))
+    for color, cluster_id in zip(colors, unique_clusters):
+        subset = scatter_df[scatter_df["cluster"] == cluster_id]
+        plt.scatter(
+            subset["LONGITUDE"],
+            subset["LATITUDE"],
+            s=8,
+            alpha=0.6,
+            color=color,
+            label=f"Cluster {cluster_id}",
+        )
+    plt.legend(title="\u805a\u7c7b\u7c7b\u522b", loc="best")
     plt.title("\u805a\u7c7b\u5730\u7406\u7a7a\u95f4\u5206\u5e03")
     plt.xlabel("\u7ecf\u5ea6")
     plt.ylabel("\u7eac\u5ea6")
