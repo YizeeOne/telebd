@@ -146,3 +146,46 @@ K-means 聚类：k=3，距离阈值=5.79，异常 652（1.00%）。
 - `report_assets/exception/anomaly_isoforest_top20.csv`
 - `report_assets/exception/anomaly_kmeans_top20.csv`
 - `report_assets/exception/exception_stats.json`
+
+---
+
+## 可视化图表（29 张）
+
+### 突发高负荷
+![流量突增差值分布](report_assets/exception/fig01_spike_diff_hist.png)
+![突发高负荷周内分布](report_assets/exception/fig02_spike_weekday_bar.png)
+![突发高负荷小时分布](report_assets/exception/fig03_spike_hour_bar.png)
+![突发高负荷场景Top10](report_assets/exception/fig04_spike_scene_bar.png)
+![突发高负荷类型分布](report_assets/exception/fig05_spike_type_bar.png)
+![突发增幅-用户数散点](report_assets/exception/fig06_spike_diff_user_scatter.png)
+![突发增幅Top20](report_assets/exception/fig07_spike_top20_bar.png)
+
+### 长期高负荷
+![流量均值分布](report_assets/exception/fig08_flow_mean_hist.png)
+![长期高负荷场景Top10](report_assets/exception/fig09_highload_scene_bar.png)
+![长期高负荷类型分布](report_assets/exception/fig10_highload_type_bar.png)
+![用户-流量散点（高负荷高亮）](report_assets/exception/fig11_flow_user_scatter_highload.png)
+![高负荷流量波动箱线图](report_assets/exception/fig12_highload_flow_cv_box.png)
+![高负荷流量波动分布](report_assets/exception/fig13_highload_flow_cv_hist.png)
+
+### 用户异常行为
+![用户-流量异常区](report_assets/exception/fig14_user_flow_scatter_p99.png)
+![高用户低人均流量区](report_assets/exception/fig15_user_fpu_scatter.png)
+![高用户低人均流量Top20](report_assets/exception/fig16_high_user_low_fpu_top20_bar.png)
+![高用户高流量Top20](report_assets/exception/fig17_high_user_high_flow_top20_bar.png)
+![高用户低人均流量场景Top10](report_assets/exception/fig18_high_user_low_fpu_scene_bar.png)
+![高用户低人均流量类型分布](report_assets/exception/fig19_high_user_low_fpu_type_bar.png)
+
+### 时间序列与节假日
+![日流量趋势](report_assets/exception/fig20_daily_flow_line.png)
+![日用户趋势](report_assets/exception/fig21_daily_user_line.png)
+![星期维度平均流量](report_assets/exception/fig22_weekday_flow_bar.png)
+![节假日流量对比](report_assets/exception/fig23_holiday_flow_bar.png)
+![星期×小时流量热力图](report_assets/exception/fig24_weekday_hour_heatmap_flow.png)
+![星期×小时用户热力图](report_assets/exception/fig25_weekday_hour_heatmap_user.png)
+
+### 异常检测方法
+![流量均值分位阈值](report_assets/exception/fig26_flow_mean_hist_thresholds.png)
+![IsolationForest分数分布](report_assets/exception/fig27_isoforest_score_hist.png)
+![KMeans距离分布](report_assets/exception/fig28_kmeans_dist_hist.png)
+![各方法异常数量对比](report_assets/exception/fig29_anomaly_counts_bar.png)
