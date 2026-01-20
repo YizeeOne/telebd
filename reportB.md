@@ -32,6 +32,8 @@
 
 ### 3.1 全局概览
 
+关键数据： total_records=93,850,560; total_flow=8.977e10 MB; date_range=2021-02-09~2021-04-09 (60 days); flow_mean=956.57, flow_std=1493.66 (CV=1.56); user_mean=269.12, user_std=393.58 (CV=1.46); cell_corr(flow_sum,user_sum)=0.669; daily_max=1,797,291,580 (2021-04-09), daily_min=1,073,917,202 (2021-02-15), diff=67.4%.
+
 全量有效记录数为 93,850,560 条（FLOW_SUM/USER_COUNT 均为非负），核心统计量如下：
 
 |指标|均值|标准差|最小值|最大值|有效记录数|
@@ -54,6 +56,8 @@
 
 ### 3.2 时间维度与节假日差异
 
+关键数据： hourly flow peak=1288.04 @12, trough=398.60 @4 (peak/trough=3.23); hourly user peak=357.30 @17, trough=154.82 @3 (peak/trough=2.31); weekday delta vs mean: flow Fri +2.47%, Sun -1.59%; user Thu -2.14%, Sun -1.81%; holiday daily mean: flow 1.253e9 vs 1.545e9 (-18.9%), user 3.41e8 vs 4.37e8 (-22.0%).
+
 从小时、星期与节假日维度观察网络潮汐规律（节假日按 2021 年法定假日表重新标注），并用热力图揭示“小时-星期”交互特征。
 
 ![小时维度平均流量](report_assets/section3/fig06_hourly_mean_flow.png)
@@ -74,6 +78,8 @@
 
 ### 3.3 场景与类型差异
 
+关键数据： scene share of total flow: SCENE2=33.38%, SCENE5=20.20%, SCENE6=12.24% (top3=65.8%); type means: TYPE2 flow_mean=1064.74, TYPE0 flow_per_user=8.67 (highest).
+
 按场景（SCENE）与类型（TYPE）分析小区平均水平和总量结构，识别核心价值场景。
 
 ![不同场景的小区平均流量分布](report_assets/section3/fig10_scene_flow_box.png)
@@ -87,6 +93,8 @@
 ![不同 TYPE 的平均用户数](report_assets/section3/fig14_type_user_bar.png)
 
 ### 3.4 TOP 分析
+
+关键数据： top10 flow sum=189,914,493 MB (0.21% of total); top1% share=5.57%; top10 flow_per_user all in SCENE=5, TYPE=0.
 
 从小区总流量与人均流量两个维度进行排名，识别核心贡献与高价值小区。
 
@@ -126,6 +134,8 @@ TOP10 人均流量（单位：MB/人）：
 
 ### 3.5 异常分析
 
+关键数据： silent_ratio>0 cells=7.53%; silent_ratio>=0.5 cells=6 (0.009%); highload threshold=6,093,868.32 MB; highload cells=652 (1.00%).
+
 定义“静默小区”为“有用户无流量”的时间占比 ≥ 50% 的小区；定义“高负荷小区”为全量小区总流量位于前 1% 的小区（阈值 6,093,868.32 MB）。识别结果如下：
 
 - 静默小区：6 个（占比极低，属于边缘异常）。
@@ -138,6 +148,8 @@ TOP10 人均流量（单位：MB/人）：
 ![高负荷小区数量（按场景）](report_assets/section3/fig21_highload_scene.png)
 
 ### 3.6 指标扩展与空间特征
+
+关键数据： flow_mean median=696.44, p90=2101.40; user_mean median=163.35, p90=638.71; flow_per_user median=3.72, p90=11.25; peak_ratio median=8.63, p90=18.84; activity_mean median=0.00634, p90=0.02283.
 
 基于 flow_per_user、PAR、ActivityScore 与经纬度特征补充多维分析。
 
@@ -204,6 +216,8 @@ Chart)：横轴经度，纵轴纬度，气泡大小代表流量大小，颜色�
 
 ### 5.1 小区画像聚类（多特征剖面）
 
+关键数据： total_cells=65174; k=2 (CH=47793.72, DB=0.841); cluster_sizes=11819 (18.1%) / 53355 (81.9%); peak_hour=20 vs 12.
+
 选取全量小区，构建“24 小时流量占比 + 24 小时用户占比 + 关键指标（flow_mean、user_mean、flow_per_user、activity_mean）”的组合特征，并进行 K-means 聚类。综合轮廓系数、CH 与 DB 指标，最优 K=2，聚类规模分别为 11819 与 53355。两类在峰值时段上存在明显差异：Cluster 0 峰值集中在 20 点，Cluster 1 峰值集中在 12 点，体现“夜间活跃型”与“午间主峰型”的对照。
 
 ![聚类能量曲线](report_assets/section5/fig01_elbow_kmeans.png)
@@ -234,6 +248,8 @@ Chart)：横轴经度，纵轴纬度，气泡大小代表流量大小，颜色�
 
 ### 5.2 趋势预测（小时-星期基线模型）
 
+关键数据： target_cell=621; test_days=7; flow MAE=1732.52, MAPE=1.219; user MAE=107.70, MAPE=0.242.
+
 以流量贡献最高的小区（CELL_ID=621）为样本，采用“小时-星期”均值作为基线预测方法，使用最近 7 天作为测试集。预测结果表明：流量 MAE=1732.52，MAPE=1.219；用户数 MAE=107.70，MAPE=0.242。该基线模型能刻画整体周期，但在高波动时段仍有残差。
 
 ![流量预测对比](report_assets/section5/fig13_actual_vs_pred_flow.png)
@@ -252,13 +268,17 @@ Chart)：横轴经度，纵轴纬度，气泡大小代表流量大小，颜色�
 
 ### 5.3 指标相关性洞察
 
+关键数据： cell_corr(flow_mean,user_mean)=0.669 (相关性明显但不完全一致).
+
 基于小区层面的多指标相关性，流量、用户数、人均流量与活跃度之间存在明显相关结构，可用于后续的特征筛选与异常解释。
 
 ![指标相关性热力图](report_assets/section5/fig10_correlation_heatmap.png)
 
 ### 5.4 高负荷/静默小区画像
 
-结合第 3 部分的高负荷阈值与静默比例阈值，对高负荷与静默小区进行场景、类型分布对比，并输出 top‑N 个体画像。
+关键数据： highload threshold=6,093,868.32 MB (652 cells, 1.00%); silent threshold=0.5 (6 cells, 0.009%); highload top20 flow range=12,702,654~24,892,078 MB; silent ratio range=0.5875~0.9688 (n=6).
+
+结合第 3 部分的高负荷阈值与静默比例阈值，对高负荷与静默小区进行场景、类型分布对比，并输出 top20 个体画像。
 
 ![高负荷小区场景分布](report_assets/section5/fig20_highload_scene_bar.png)
 
@@ -302,6 +322,8 @@ Chart)：横轴经度，纵轴纬度，气泡大小代表流量大小，颜色�
 - 图表数量多且维度跨度大。解决方案：将绘图流程模块化，分别输出场景对比、节假日对比、日历热力图与趋势对比图。
 
 ### 7.2 关键结论与图表支撑
+
+关键数据： scene2 peak=1671.16 @21, trough=425.32 @4; scene6 peak=1246.77 @20, trough=337.83 @4; daily corr(flow,user)=0.911; daily max=1,797,291,580 (2021-04-09), min=1,073,917,202 (2021-02-15), diff=67.4%; holiday daily mean: flow 1.253e9 vs 1.545e9 (-18.9%), user 3.41e8 vs 4.37e8 (-22.0%); daily |change| p90=7.41%.
 
 - 典型 24 小时流量曲线显示，不同场景存在明显的昼夜差异，适用于差异化运维策略。
 
