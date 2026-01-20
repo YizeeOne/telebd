@@ -12,7 +12,12 @@ import seaborn as sns
 
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score, silhouette_score
+from sklearn.metrics import (
+    calinski_harabasz_score,
+    davies_bouldin_score,
+    r2_score,
+    silhouette_score,
+)
 
 
 DATA_PATH = Path("all_final_data_with_attributes.csv")
@@ -49,6 +54,25 @@ def save_fig(name: str) -> None:
 def safe_mean(sum_vals: np.ndarray, cnt_vals: np.ndarray) -> np.ndarray:
     denom = np.where(cnt_vals == 0, np.nan, cnt_vals)
     return sum_vals / denom
+
+
+def safe_r2(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    if np.nanstd(y_true) == 0:
+        return float("nan")
+    return float(r2_score(y_true, y_pred))
+
+
+def add_metric_box(ax: plt.Axes, text: str) -> None:
+    ax.text(
+        0.01,
+        0.98,
+        text,
+        transform=ax.transAxes,
+        va="top",
+        ha="left",
+        fontsize=9,
+        bbox={"boxstyle": "round,pad=0.3", "fc": "white", "ec": "#666666", "alpha": 0.8},
+    )
 
 
 def weekday_labels(values: list[int]) -> list[str]:
@@ -403,23 +427,37 @@ def main() -> None:
     user_mae = np.mean(np.abs(actual_user - pred_user))
     flow_mape = np.mean(np.abs(actual_flow - pred_flow) / np.maximum(actual_flow, 1e-6))
     user_mape = np.mean(np.abs(actual_user - pred_user) / np.maximum(actual_user, 1e-6))
+    flow_rmse = np.sqrt(np.mean((actual_flow - pred_flow) ** 2))
+    user_rmse = np.sqrt(np.mean((actual_user - pred_user) ** 2))
+    flow_r2 = safe_r2(actual_flow, pred_flow)
+    user_r2 = safe_r2(actual_user, pred_user)
+    flow_mape_pct = flow_mape * 100
+    user_mape_pct = user_mape * 100
 
-    plt.figure(figsize=(10, 4))
-    plt.plot(test.index, actual_flow, label="\u771f\u5b9e")
-    plt.plot(test.index, pred_flow, label="\u9884\u6d4b")
-    plt.title("\u6d41\u91cf\u9884\u6d4b\u5bf9\u6bd4\uff08\u7c7b\u4f3c\u5b63\u8282\u6027\u57fa\u7ebf\uff09")
-    plt.xlabel("\u65f6\u95f4")
-    plt.ylabel("\u6d41\u91cf\uff08MB\uff09")
-    plt.legend()
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(test.index, actual_flow, label="\u771f\u5b9e")
+    ax.plot(test.index, pred_flow, label="\u9884\u6d4b")
+    ax.set_title("\u6d41\u91cf\u9884\u6d4b\u5bf9\u6bd4\uff08\u7c7b\u4f3c\u5b63\u8282\u6027\u57fa\u7ebf\uff09")
+    ax.set_xlabel("\u65f6\u95f4")
+    ax.set_ylabel("\u6d41\u91cf\uff08MB\uff09")
+    ax.legend()
+    add_metric_box(
+        ax,
+        f"MAE={flow_mae:.2f}\nRMSE={flow_rmse:.2f}\nMAPE={flow_mape_pct:.1f}%\nR2={flow_r2:.3f}",
+    )
     save_fig("fig13_actual_vs_pred_flow.png")
 
-    plt.figure(figsize=(10, 4))
-    plt.plot(test.index, actual_user, label="\u771f\u5b9e")
-    plt.plot(test.index, pred_user, label="\u9884\u6d4b")
-    plt.title("\u7528\u6237\u6570\u9884\u6d4b\u5bf9\u6bd4\uff08\u7c7b\u4f3c\u5b63\u8282\u6027\u57fa\u7ebf\uff09")
-    plt.xlabel("\u65f6\u95f4")
-    plt.ylabel("\u7528\u6237\u6570")
-    plt.legend()
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(test.index, actual_user, label="\u771f\u5b9e")
+    ax.plot(test.index, pred_user, label="\u9884\u6d4b")
+    ax.set_title("\u7528\u6237\u6570\u9884\u6d4b\u5bf9\u6bd4\uff08\u7c7b\u4f3c\u5b63\u8282\u6027\u57fa\u7ebf\uff09")
+    ax.set_xlabel("\u65f6\u95f4")
+    ax.set_ylabel("\u7528\u6237\u6570")
+    ax.legend()
+    add_metric_box(
+        ax,
+        f"MAE={user_mae:.2f}\nRMSE={user_rmse:.2f}\nMAPE={user_mape_pct:.1f}%\nR2={user_r2:.3f}",
+    )
     save_fig("fig14_actual_vs_pred_user.png")
 
     residual_flow = actual_flow - pred_flow
@@ -527,8 +565,14 @@ def main() -> None:
             "test_days": int(TEST_DAYS),
             "flow_mae": float(flow_mae),
             "flow_mape": float(flow_mape),
+            "flow_mape_pct": float(flow_mape_pct),
+            "flow_rmse": float(flow_rmse),
+            "flow_r2": float(flow_r2),
             "user_mae": float(user_mae),
             "user_mape": float(user_mape),
+            "user_mape_pct": float(user_mape_pct),
+            "user_rmse": float(user_rmse),
+            "user_r2": float(user_r2),
         },
         "highload": {
             "threshold": float(high_load_threshold),
