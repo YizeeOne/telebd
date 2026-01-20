@@ -45,14 +45,39 @@
 |ActivityScore|0.0099|0.0138|0.0000|0.5419|93,850,560|
 
 ![业务流量与用户数分布](report_assets/section3/fig01_flow_user_hist.png)
+含义：该图展示业务流量与用户数分布。
+意义：判断集中程度、偏态与长尾特征。
+用法：用于设置阈值、识别异常或分层。
+
+
 
 ![业务流量与用户数箱线图](report_assets/section3/fig02_flow_user_box.png)
+含义：该图展示业务流量与用户数箱线图。
+意义：刻画分位区间与离散程度，便于稳健比较。
+用法：比较中位数与波动，识别高波动或异常组。
+
+
 
 ![业务流量-用户数密度](report_assets/section3/fig03_flow_user_scatter.png)
+含义：该图展示业务流量-用户数密度。
+意义：提供整体结构与差异的直观视角。
+用法：辅助定位重点区间与异常样本。
+
+
 
 ![全网日总流量走势](report_assets/section3/fig04_daily_total_flow.png)
+含义：该图展示全网日总流量走势。
+意义：刻画随时间的变化与周期性规律。
+用法：识别峰谷与突变点，支持容量与资源配置。
+
+
 
 ![全网日总用户数走势](report_assets/section3/fig05_daily_total_user.png)
+含义：该图展示全网日总用户数走势。
+意义：刻画随时间的变化与周期性规律。
+用法：识别峰谷与突变点，支持容量与资源配置。
+
+
 
 ### 3.2 时间维度与节假日差异
 
@@ -61,20 +86,60 @@
 从小时、星期与节假日维度观察网络潮汐规律（节假日按 2021 年法定假日表重新标注），并用热力图揭示“小时-星期”交互特征。
 
 ![小时维度平均流量](report_assets/section3/fig06_hourly_mean_flow.png)
+含义：该图展示小时维度平均流量。
+意义：提供整体结构与差异的直观视角。
+用法：辅助定位重点区间与异常样本。
+
+
 
 ![小时维度平均用户数](report_assets/section3/fig07_hourly_mean_user.png)
+含义：该图展示小时维度平均用户数。
+意义：提供整体结构与差异的直观视角。
+用法：辅助定位重点区间与异常样本。
+
+
 
 ![星期维度平均流量](report_assets/section3/fig08_weekday_mean_flow.png)
+含义：该图展示星期维度平均流量。
+意义：提供整体结构与差异的直观视角。
+用法：辅助定位重点区间与异常样本。
+
+
 
 ![星期维度平均用户数](report_assets/section3/fig09_weekday_mean_user.png)
+含义：该图展示星期维度平均用户数。
+意义：提供整体结构与差异的直观视角。
+用法：辅助定位重点区间与异常样本。
+
+
 
 ![节假日与工作日的小时流量对比](report_assets/section3/fig25_hourly_holiday_flow.png)
+含义：该图展示节假日与工作日的小时流量对比。
+意义：量化节假日与工作日差异，体现节假日效应。
+用法：用于节假日保障与弹性资源配置。
+
+
 
 ![节假日与工作日的小时用户数对比](report_assets/section3/fig26_hourly_holiday_user.png)
+含义：该图展示节假日与工作日的小时用户数对比。
+意义：量化节假日与工作日差异，体现节假日效应。
+用法：用于节假日保障与弹性资源配置。
+
+
 
 ![小时-星期维度流量热力图](report_assets/section3/fig15_hour_weekday_heatmap_flow.png)
+含义：该图展示小时-星期维度流量热力图。
+意义：揭示不同维度组合下的强度分布与热点区域。
+用法：定位高值/低值区间，用于时段、场景或类型优化。
+
+
 
 ![小时-星期维度用户数热力图](report_assets/section3/fig16_hour_weekday_heatmap_user.png)
+含义：该图展示小时-星期维度用户数热力图。
+意义：揭示不同维度组合下的强度分布与热点区域。
+用法：定位高值/低值区间，用于时段、场景或类型优化。
+
+
 
 ### 3.3 场景与类型差异
 
@@ -83,14 +148,39 @@
 按场景（SCENE）与类型（TYPE）分析小区平均水平和总量结构，识别核心价值场景。
 
 ![不同场景的小区平均流量分布](report_assets/section3/fig10_scene_flow_box.png)
+含义：该图展示不同场景的小区平均流量分布。
+意义：判断集中程度、偏态与长尾特征。
+用法：用于设置阈值、识别异常或分层。
+
+
 
 ![不同场景的小区平均用户数分布](report_assets/section3/fig11_scene_user_box.png)
+含义：该图展示不同场景的小区平均用户数分布。
+意义：判断集中程度、偏态与长尾特征。
+用法：用于设置阈值、识别异常或分层。
+
+
 
 ![场景总流量 TOP10](report_assets/section3/fig12_scene_flow_share.png)
+含义：该图展示场景总流量 TOP10。
+意义：揭示头部集中度与贡献结构。
+用法：确定重点对象或场景优先级。
+
+
 
 ![不同 TYPE 的平均流量](report_assets/section3/fig13_type_flow_bar.png)
+含义：该图展示不同 TYPE 的平均流量。
+意义：提供整体结构与差异的直观视角。
+用法：辅助定位重点区间与异常样本。
+
+
 
 ![不同 TYPE 的平均用户数](report_assets/section3/fig14_type_user_bar.png)
+含义：该图展示不同 TYPE 的平均用户数。
+意义：提供整体结构与差异的直观视角。
+用法：辅助定位重点区间与异常样本。
+
+
 
 ### 3.4 TOP 分析
 
@@ -129,8 +219,18 @@ TOP10 人均流量（单位：MB/人）：
 |10|54674|5|0|47.65|
 
 ![TOP10 小区总流量](report_assets/section3/fig17_top10_flow.png)
+含义：该图展示TOP10 小区总流量。
+意义：揭示头部集中度与贡献结构。
+用法：确定重点对象或场景优先级。
+
+
 
 ![TOP10 人均流量](report_assets/section3/fig18_top10_flow_per_user.png)
+含义：该图展示TOP10 人均流量。
+意义：揭示头部集中度与贡献结构。
+用法：确定重点对象或场景优先级。
+
+
 
 ### 3.5 异常分析
 
@@ -142,10 +242,25 @@ TOP10 人均流量（单位：MB/人）：
 - 高负荷小区：652 个（核心承载区，需重点关注扩容与保障）。
 
 ![静默比例分布](report_assets/section3/fig19_silent_ratio_hist.png)
+含义：该图展示静默比例分布。
+意义：判断集中程度、偏态与长尾特征。
+用法：用于设置阈值、识别异常或分层。
+
+
 
 ![静默小区数量（按场景）](report_assets/section3/fig20_silent_scene.png)
+含义：该图展示静默小区数量（按场景）。
+意义：提供整体结构与差异的直观视角。
+用法：辅助定位重点区间与异常样本。
+
+
 
 ![高负荷小区数量（按场景）](report_assets/section3/fig21_highload_scene.png)
+含义：该图展示高负荷小区数量（按场景）。
+意义：提供整体结构与差异的直观视角。
+用法：辅助定位重点区间与异常样本。
+
+
 
 ### 3.6 指标扩展与空间特征
 
@@ -154,12 +269,32 @@ TOP10 人均流量（单位：MB/人）：
 基于 flow_per_user、PAR、ActivityScore 与经纬度特征补充多维分析。
 
 ![人均流量分布](report_assets/section3/fig24_flow_per_user_hist.png)
+含义：该图展示人均流量分布。
+意义：判断集中程度、偏态与长尾特征。
+用法：用于设置阈值、识别异常或分层。
+
+
 
 ![PAR 分布](report_assets/section3/fig22_par_hist.png)
+含义：该图展示PAR 分布。
+意义：判断集中程度、偏态与长尾特征。
+用法：用于设置阈值、识别异常或分层。
+
+
 
 ![活跃度评分分布](report_assets/section3/fig21_activityscore_hist.png)
+含义：该图展示活跃度评分分布。
+意义：判断集中程度、偏态与长尾特征。
+用法：用于设置阈值、识别异常或分层。
+
+
 
 ![经纬度泡泡图（大小=流量，颜色=人均流量）](report_assets/section3/fig27_geo_bubble_flow.png)
+含义：该图展示经纬度泡泡图（大小=流量，颜色=人均流量）。
+意义：揭示空间分布与热点区域。
+用法：定位重点区域进行扩容或优化。
+
+
 
 ### 3.7 流程与派生指标说明
 
@@ -174,9 +309,7 @@ TOP10 人均流量（单位：MB/人）：
 - 活跃度均值：`activity_mean = activity_sum / activity_count`
 - PAR 均值：`par_mean = par_sum / par_count`
 
-对应的产出文件：`section3_descriptive.py`、`report_assets/section3/section3_stats.json`、`report_assets/section3/section3_cell_agg.csv` 与 `report_assets/section3/fig01_flow_user_hist.png` 至 `report_assets/section3/fig27_geo_bubble_flow.png`。
-
-## 4. 多维度对比与趋势分析
+对应的产出文件：`section3_descriptive.py`、`report_assets/section3/section3_stats.json`、`report_assets/section3/section3_cell_agg.csv` 与 `report_assets/section3/fig01_flow_user_hist.png` 至 `report_assets/section3/fig27_geo_bubble_flow.png`。## 4. 多维度对比与趋势分析
 
 4.1 日内潮汐规律分析
 
@@ -221,30 +354,95 @@ Chart)：横轴经度，纵轴纬度，气泡大小代表流量大小，颜色�
 选取全量小区，构建“24 小时流量占比 + 24 小时用户占比 + 关键指标（flow_mean、user_mean、flow_per_user、activity_mean）”的组合特征，并进行 K-means 聚类。综合轮廓系数、CH 与 DB 指标，最优 K=2，聚类规模分别为 11819 与 53355。两类在峰值时段上存在明显差异：Cluster 0 峰值集中在 20 点，Cluster 1 峰值集中在 12 点，体现“夜间活跃型”与“午间主峰型”的对照。
 
 ![聚类能量曲线](report_assets/section5/fig01_elbow_kmeans.png)
+含义：该图展示聚类能量曲线。
+意义：刻画随时间的变化与周期性规律。
+用法：识别峰谷与突变点，支持容量与资源配置。
+
+
 
 ![轮廓系数曲线](report_assets/section5/fig02_silhouette_scores.png)
+含义：该图展示轮廓系数曲线。
+意义：刻画随时间的变化与周期性规律。
+用法：识别峰谷与突变点，支持容量与资源配置。
+
+
 
 ![CH 指标曲线](report_assets/section5/fig02b_ch_scores.png)
+含义：该图展示CH 指标曲线。
+意义：刻画随时间的变化与周期性规律。
+用法：识别峰谷与突变点，支持容量与资源配置。
+
+
 
 ![DB 指标曲线](report_assets/section5/fig02c_db_scores.png)
+含义：该图展示DB 指标曲线。
+意义：刻画随时间的变化与周期性规律。
+用法：识别峰谷与突变点，支持容量与资源配置。
+
+
 
 ![聚类平均日内曲线](report_assets/section5/fig03_cluster_profiles.png)
+含义：该图展示聚类平均日内曲线。
+意义：刻画随时间的变化与周期性规律。
+用法：识别峰谷与突变点，支持容量与资源配置。
+
+
 
 ![聚类规模](report_assets/section5/fig04_cluster_sizes.png)
+含义：该图展示聚类规模。
+意义：展示聚类规模差异与主导类型。
+用法：判断细分策略与资源倾斜方向。
+
+
 
 ![聚类与场景关系热力图](report_assets/section5/fig05_cluster_scene_heatmap.png)
+含义：该图展示聚类与场景关系热力图。
+意义：揭示不同维度组合下的强度分布与热点区域。
+用法：定位高值/低值区间，用于时段、场景或类型优化。
+
+
 
 ![聚类与 TYPE 分布](report_assets/section5/fig06_cluster_type_bar.png)
+含义：该图展示聚类与 TYPE 分布。
+意义：判断集中程度、偏态与长尾特征。
+用法：用于设置阈值、识别异常或分层。
+
+
 
 ![聚类空间分布](report_assets/section5/fig07_cluster_geo_scatter.png)
+含义：该图展示聚类空间分布。
+意义：揭示空间分布与热点区域。
+用法：定位重点区域进行扩容或优化。
+
+
 
 ![聚类综合雷达图](report_assets/section5/fig08_cluster_radar.png)
+含义：该图展示聚类综合雷达图。
+意义：展示多指标画像差异与对照。
+用法：用于对比不同聚类/场景的综合特征。
+
+
 
 ![聚类时间热力图](report_assets/section5/fig09_cluster_hour_heatmap.png)
+含义：该图展示聚类时间热力图。
+意义：揭示不同维度组合下的强度分布与热点区域。
+用法：定位高值/低值区间，用于时段、场景或类型优化。
+
+
 
 ![聚类 PCA 可视化](report_assets/section5/fig12_cluster_pca.png)
+含义：该图展示聚类 PCA 可视化。
+意义：评估聚类在低维空间的可分性。
+用法：用于验证聚类结果的区分度与重叠情况。
+
+
 
 ![小区峰值时段分布](report_assets/section5/fig11_peak_hour_distribution.png)
+含义：该图展示小区峰值时段分布。
+意义：展示峰值时段集中程度与分布形态。
+用法：用于错峰策略与资源调度。
+
+
 
 ### 5.2 趋势预测（小时-星期基线模型）
 
@@ -253,18 +451,53 @@ Chart)：横轴经度，纵轴纬度，气泡大小代表流量大小，颜色�
 以流量贡献最高的小区（CELL_ID=621）为样本，采用“小时-星期”均值作为基线预测方法，使用最近 7 天作为测试集。预测结果表明：流量 MAE=1732.52，MAPE=1.219；用户数 MAE=107.70，MAPE=0.242。该基线模型能刻画整体周期，但在高波动时段仍有残差。
 
 ![流量预测对比](report_assets/section5/fig13_actual_vs_pred_flow.png)
+含义：该图展示流量预测对比。
+意义：评估预测效果与偏差水平。
+用法：根据误差诊断是否需引入更多特征。
+
+
 
 ![用户数预测对比](report_assets/section5/fig14_actual_vs_pred_user.png)
+含义：该图展示用户数预测对比。
+意义：评估预测效果与偏差水平。
+用法：根据误差诊断是否需引入更多特征。
+
+
 
 ![流量残差分布](report_assets/section5/fig15_residual_hist_flow.png)
+含义：该图展示流量残差分布。
+意义：刻画误差分布与系统性偏差。
+用法：定位高误差时段，优化模型或特征。
+
+
 
 ![流量残差走势](report_assets/section5/fig16_residual_ts_flow.png)
+含义：该图展示流量残差走势。
+意义：刻画误差分布与系统性偏差。
+用法：定位高误差时段，优化模型或特征。
+
+
 
 ![流量真实-预测散点](report_assets/section5/fig17_actual_vs_pred_scatter_flow.png)
+含义：该图展示流量真实-预测散点。
+意义：揭示变量关系与离群点分布。
+用法：识别高流量低用户等异常组合。
+
+
 
 ![用户数残差分布](report_assets/section5/fig18_residual_hist_user.png)
+含义：该图展示用户数残差分布。
+意义：刻画误差分布与系统性偏差。
+用法：定位高误差时段，优化模型或特征。
+
+
 
 ![用户数真实-预测散点](report_assets/section5/fig19_actual_vs_pred_scatter_user.png)
+含义：该图展示用户数真实-预测散点。
+意义：揭示变量关系与离群点分布。
+用法：识别高流量低用户等异常组合。
+
+
 
 ### 5.3 指标相关性洞察
 
@@ -273,6 +506,11 @@ Chart)：横轴经度，纵轴纬度，气泡大小代表流量大小，颜色�
 基于小区层面的多指标相关性，流量、用户数、人均流量与活跃度之间存在明显相关结构，可用于后续的特征筛选与异常解释。
 
 ![指标相关性热力图](report_assets/section5/fig10_correlation_heatmap.png)
+含义：该图展示指标相关性热力图。
+意义：揭示不同维度组合下的强度分布与热点区域。
+用法：定位高值/低值区间，用于时段、场景或类型优化。
+
+
 
 ### 5.4 高负荷/静默小区画像
 
@@ -281,16 +519,46 @@ Chart)：横轴经度，纵轴纬度，气泡大小代表流量大小，颜色�
 结合第 3 部分的高负荷阈值与静默比例阈值，对高负荷与静默小区进行场景、类型分布对比，并输出 top20 个体画像。
 
 ![高负荷小区场景分布](report_assets/section5/fig20_highload_scene_bar.png)
+含义：该图展示高负荷小区场景分布。
+意义：判断集中程度、偏态与长尾特征。
+用法：用于设置阈值、识别异常或分层。
+
+
 
 ![高负荷小区 TYPE 分布](report_assets/section5/fig21_highload_type_bar.png)
+含义：该图展示高负荷小区 TYPE 分布。
+意义：判断集中程度、偏态与长尾特征。
+用法：用于设置阈值、识别异常或分层。
+
+
 
 ![静默小区场景分布](report_assets/section5/fig20_silent_scene_bar.png)
+含义：该图展示静默小区场景分布。
+意义：判断集中程度、偏态与长尾特征。
+用法：用于设置阈值、识别异常或分层。
+
+
 
 ![静默小区 TYPE 分布](report_assets/section5/fig21_silent_type_bar.png)
+含义：该图展示静默小区 TYPE 分布。
+意义：判断集中程度、偏态与长尾特征。
+用法：用于设置阈值、识别异常或分层。
+
+
 
 ![TOP20 高负荷小区总流量](report_assets/section5/fig22_highload_top20.png)
+含义：该图展示TOP20 高负荷小区总流量。
+意义：揭示头部集中度与贡献结构。
+用法：确定重点对象或场景优先级。
+
+
 
 ![TOP20 静默小区比例](report_assets/section5/fig23_silent_top20.png)
+含义：该图展示TOP20 静默小区比例。
+意义：揭示头部集中度与贡献结构。
+用法：确定重点对象或场景优先级。
+
+
 
 ### 5.5 结论摘要
 
@@ -303,9 +571,7 @@ Chart)：横轴经度，纵轴纬度，气泡大小代表流量大小，颜色�
 - 代码文件：`section5_advanced.py`
 - 统计汇总：`report_assets/section5/section5_stats.json`
 - 图表输出（27 张）：`report_assets/section5/fig01_elbow_kmeans.png` 至 `report_assets/section5/fig23_silent_top20.png`
-- 个体画像输出：`report_assets/section5/highload_top20.csv`、`report_assets/section5/silent_top20.csv`
-
-## 6. 商业价值建议
+- 个体画像输出：`report_assets/section5/highload_top20.csv`、`report_assets/section5/silent_top20.csv`## 6. 商业价值建议
 
 网络扩容建议：针对高负荷、高增速的小区，提出增加基站部署的方案。
 
@@ -328,28 +594,63 @@ Chart)：横轴经度，纵轴纬度，气泡大小代表流量大小，颜色�
 - 典型 24 小时流量曲线显示，不同场景存在明显的昼夜差异，适用于差异化运维策略。
 
 ![24小时典型流量曲线（场景2 vs 6）](report_assets/section7/fig01_diurnal_scene_2_6.png)
+含义：该图展示24小时典型流量曲线（场景2 vs 6）。
+意义：刻画随时间的变化与周期性规律。
+用法：识别峰谷与突变点，支持容量与资源配置。
+
+
 
 - 双轴趋势图显示流量与用户数大体同步，但在节假日前后出现“高流量/低用户”或“高用户/低流量”的异常波动。
 
 ![双轴趋势图（流量 vs 用户数）](report_assets/section7/fig02_dual_axis_daily.png)
+含义：该图展示双轴趋势图（流量 vs 用户数）。
+意义：对比两指标的同步与背离关系。
+用法：识别高流量低用户等异常时段。
+
+
 
 - 日历热力图能直观看到春节期间（2 月 12 日附近）的整体流量波动特征。
 
 ![日历热力图（日总流量）](report_assets/section7/fig03_calendar_heatmap_flow.png)
+含义：该图展示日历热力图（日总流量）。
+意义：展示日历尺度的波动与节假日效应。
+用法：识别低谷/异常日期，支持运维排期与预测建模。
+
+
 
 - 人均流量与日流量变化率曲线反映出节假日与工作日之间的结构性差异。
 
 ![日级人均流量趋势](report_assets/section7/fig04_daily_flow_per_user.png)
+含义：该图展示日级人均流量趋势。
+意义：刻画随时间的变化与周期性规律。
+用法：识别峰谷与突变点，支持容量与资源配置。
+
+
 
 ![日流量变化率](report_assets/section7/fig07_daily_flow_change.png)
+含义：该图展示日流量变化率。
+意义：提供整体结构与差异的直观视角。
+用法：辅助定位重点区间与异常样本。
+
+
 
 - 节假日与非节假日对比表明，节假日整体流量与用户数水平出现显著变化。
 
 ![节假日与非节假日对比](report_assets/section7/fig06_holiday_vs_nonholiday.png)
+含义：该图展示节假日与非节假日对比。
+意义：量化节假日与工作日差异，体现节假日效应。
+用法：用于节假日保障与弹性资源配置。
+
+
 
 - 日级流量与用户数散点图说明两者整体相关，但存在离群点，提示潜在的异常运营场景。
 
 ![日级流量-用户数散点](report_assets/section7/fig05_daily_flow_user_scatter.png)
+含义：该图展示日级流量-用户数散点。
+意义：揭示变量关系与离群点分布。
+用法：识别高流量低用户等异常组合。
+
+
 
 ### 7.3 未来运营商大数据分析展望
 
