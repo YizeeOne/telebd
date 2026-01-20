@@ -347,7 +347,19 @@ def main() -> None:
     pca = PCA(n_components=2, random_state=42)
     pca_points = pca.fit_transform(profile_df)
     plt.figure(figsize=(6, 5))
-    plt.scatter(pca_points[:, 0], pca_points[:, 1], c=labels, cmap="tab10", s=8, alpha=0.6)
+    unique_labels = np.unique(labels)
+    colors = plt.cm.tab10(np.linspace(0, 1, len(unique_labels)))
+    for color, label in zip(colors, unique_labels):
+        mask = labels == label
+        plt.scatter(
+            pca_points[mask, 0],
+            pca_points[mask, 1],
+            s=8,
+            alpha=0.6,
+            color=color,
+            label=f"Cluster {label}",
+        )
+    plt.legend(title="\u805a\u7c7b\u7c7b\u522b", loc="best")
     plt.title("\u805a\u7c7b\u964d\u7ef4\u53ef\u89c6\u5316\uff08PCA\uff09")
     plt.xlabel("PC1")
     plt.ylabel("PC2")
