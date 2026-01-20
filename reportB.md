@@ -431,6 +431,18 @@ Chart)：横轴经度，纵轴纬度，气泡大小代表流量大小，颜色�
 意义：用户数真实-预测散点, 揭示变量关系与离群点分布。
 用法：用户数真实-预测散点, 识别高流量低用户等异常组合。
 
+补充：基于小区层面指标的粗粒度预测。使用用户规模与类型特征（user_mean、user_max、SCENE、TYPE）通过标准化线性回归预测小区平均流量（flow_mean）。结果：MAE=444.15、RMSE=644.02、MAPE=106.5%、R2=0.491，说明用户规模与场景类型可解释约一半的平均流量差异，适合做大致估计。
+
+![小区平均流量预测散点](report_assets/section5/fig24_flow_mean_pred_scatter.png)
+含义：该图展示小区平均流量预测散点。
+意义：小区平均流量预测散点, 评估指标驱动预测的拟合度与离群点。
+用法：小区平均流量预测散点, 用于粗估小区流量水平与异常识别。
+
+![预测特征系数](report_assets/section5/fig25_flow_mean_pred_features.png)
+含义：该图展示预测特征系数。
+意义：预测特征系数, 展示各指标对平均流量预测的相对影响方向与强度。
+用法：预测特征系数, 用于确定关键指标与优化数据采集重点。
+
 ### 5.3 指标相关性洞察
 
 关键数据： cell_corr(flow_mean,user_mean)=0.669 (相关性明显但不完全一致).
@@ -488,7 +500,7 @@ Chart)：横轴经度，纵轴纬度，气泡大小代表流量大小，颜色�
 
 - 代码文件：`section5_advanced.py`
 - 统计汇总：`report_assets/section5/section5_stats.json`
-- 图表输出（27 张）：`report_assets/section5/fig01_elbow_kmeans.png` 至 `report_assets/section5/fig23_silent_top20.png`
+- 图表输出（25 张）：`report_assets/section5/fig01_elbow_kmeans.png` 至 `report_assets/section5/fig25_flow_mean_pred_features.png`
 - 个体画像输出：`report_assets/section5/highload_top20.csv`、`report_assets/section5/silent_top20.csv`## 6. 商业价值建议
 
 网络扩容建议：针对高负荷、高增速的小区，提出增加基站部署的方案。

@@ -50,5 +50,20 @@
   "silent": {
     "threshold": 0.5,
     "count": 6
+  },
+  "feature_prediction": {
+    "target": "flow_mean",
+    "features": [
+      "user_mean",
+      "user_max",
+      "SCENE",
+      "TYPE"
+    ],
+    "mae": 444.15376328436946,
+    "rmse": 644.0198862764892,
+    "mape": 1.0654155487012191,
+    "mape_pct": 106.54155487012191,
+    "r2": 0.49063755094663764,
+    "test_size": 13035
   }
 }

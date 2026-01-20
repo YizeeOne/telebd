@@ -12,6 +12,10 @@ import seaborn as sns
 
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
     calinski_harabasz_score,
     davies_bouldin_score,
@@ -368,6 +372,66 @@ def main() -> None:
     plt.title("\u6307\u6807\u76f8\u5173\u6027\u70ed\u529b\u56fe")
     save_fig("fig10_correlation_heatmap.png")
 
+    pred_feature_cols = [
+        "user_mean",
+        "user_max",
+        "SCENE",
+        "TYPE",
+    ]
+    pred_target = "flow_mean"
+    pred_df = cell_agg[pred_feature_cols + [pred_target]].dropna()
+    pred_metrics = None
+    if pred_df.shape[0] >= 500:
+        X = pred_df[pred_feature_cols].to_numpy()
+        y = pred_df[pred_target].to_numpy()
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42
+        )
+        pred_model = make_pipeline(StandardScaler(), LinearRegression())
+        pred_model.fit(X_train, y_train)
+        y_pred = pred_model.predict(X_test)
+
+        pred_mae = float(np.mean(np.abs(y_test - y_pred)))
+        pred_rmse = float(np.sqrt(np.mean((y_test - y_pred) ** 2)))
+        pred_mape = float(np.mean(np.abs(y_test - y_pred) / np.maximum(y_test, 1e-6)))
+        pred_r2 = safe_r2(y_test, y_pred)
+        pred_metrics = {
+            "target": pred_target,
+            "features": pred_feature_cols,
+            "mae": pred_mae,
+            "rmse": pred_rmse,
+            "mape": pred_mape,
+            "mape_pct": float(pred_mape * 100),
+            "r2": pred_r2,
+            "test_size": int(y_test.shape[0]),
+        }
+
+        fig, ax = plt.subplots(figsize=(6, 5))
+        ax.scatter(y_test, y_pred, s=10, alpha=0.4, color="#4C78A8")
+        min_val = float(np.nanmin([y_test.min(), y_pred.min()]))
+        max_val = float(np.nanmax([y_test.max(), y_pred.max()]))
+        ax.plot([min_val, max_val], [min_val, max_val], color="#333333", linewidth=1)
+        ax.set_title("\u5c0f\u533a\u5e73\u5747\u6d41\u91cf\u9884\u6d4b\u6563\u70b9")
+        ax.set_xlabel("\u771f\u5b9e\u503c\uff08MB\uff09")
+        ax.set_ylabel("\u9884\u6d4b\u503c\uff08MB\uff09")
+        add_metric_box(
+            ax,
+            f"MAE={pred_mae:.2f}\nRMSE={pred_rmse:.2f}\nMAPE={pred_mape*100:.1f}%\nR2={pred_r2:.3f}",
+        )
+        save_fig("fig24_flow_mean_pred_scatter.png")
+
+        coef = pred_model.named_steps["linearregression"].coef_
+        coef_series = (
+            pd.Series(coef, index=pred_feature_cols)
+            .sort_values(ascending=True)
+        )
+        plt.figure(figsize=(6, 4))
+        plt.barh(coef_series.index, coef_series.values, color="#72B7B2")
+        plt.title("\u7279\u5f81\u7cfb\u6570\uff08\u6807\u51c6\u5316\u7ebf\u6027\u56de\u5f52\uff09")
+        plt.xlabel("\u7cfb\u6570\u503c")
+        plt.ylabel("\u6307\u6807")
+        save_fig("fig25_flow_mean_pred_features.png")
+
     peak_hours = np.nanargmax(flow_hour_mean[valid_mask], axis=1)
     plt.figure(figsize=(8, 4))
     sns.countplot(x=peak_hours, color="#72B7B2")
@@ -583,6 +647,8 @@ def main() -> None:
             "count": int(silent_cells.shape[0]),
         },
     }
+    if pred_metrics is not None:
+        stats_out["feature_prediction"] = pred_metrics
 
     with open(OUT_DIR / "section5_stats.json", "w", encoding="utf-8") as f:
         json.dump(stats_out, f, ensure_ascii=False, indent=2)
