@@ -519,18 +519,25 @@ def main() -> None:
     weekday_agg["user_mean"] = weekday_agg["user_sum"] / weekday_agg["user_count"].replace(0, np.nan)
     weekday_names = weekday_labels(list(weekday_agg.index))
 
+    flow_weekday_mean = weekday_agg["flow_mean"].mean()
+    user_weekday_mean = weekday_agg["user_mean"].mean()
+    weekday_agg["flow_pct"] = (weekday_agg["flow_mean"] / flow_weekday_mean - 1) * 100
+    weekday_agg["user_pct"] = (weekday_agg["user_mean"] / user_weekday_mean - 1) * 100
+
     plt.figure(figsize=(8, 4))
-    sns.barplot(x=weekday_names, y=weekday_agg["flow_mean"], color="#4C78A8")
-    plt.title("\u661f\u671f\u7ef4\u5ea6\u5e73\u5747\u6d41\u91cf")
+    sns.barplot(x=weekday_names, y=weekday_agg["flow_pct"], color="#4C78A8")
+    plt.axhline(0, color="#333333", linewidth=1)
+    plt.title("\u661f\u671f\u7ef4\u5ea6\u5e73\u5747\u6d41\u91cf\u76f8\u5bf9\u5747\u503c")
     plt.xlabel("\u661f\u671f")
-    plt.ylabel("\u5e73\u5747\u6d41\u91cf\uff08MB\uff09")
+    plt.ylabel("\u76f8\u5bf9\u5747\u503c\uff08%\uff09")
     save_fig("fig08_weekday_mean_flow.png")
 
     plt.figure(figsize=(8, 4))
-    sns.barplot(x=weekday_names, y=weekday_agg["user_mean"], color="#F58518")
-    plt.title("\u661f\u671f\u7ef4\u5ea6\u5e73\u5747\u7528\u6237\u6570")
+    sns.barplot(x=weekday_names, y=weekday_agg["user_pct"], color="#F58518")
+    plt.axhline(0, color="#333333", linewidth=1)
+    plt.title("\u661f\u671f\u7ef4\u5ea6\u5e73\u5747\u7528\u6237\u6570\u76f8\u5bf9\u5747\u503c")
     plt.xlabel("\u661f\u671f")
-    plt.ylabel("\u5e73\u5747\u7528\u6237\u6570")
+    plt.ylabel("\u76f8\u5bf9\u5747\u503c\uff08%\uff09")
     save_fig("fig09_weekday_mean_user.png")
 
     holiday_hour_agg = holiday_hour_agg.reset_index()
