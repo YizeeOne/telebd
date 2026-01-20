@@ -1,0 +1,123 @@
+{
+  "sudden_spike": {
+    "threshold": 15581.032151519932,
+    "total_cells": 65174,
+    "spike_cells": 1464,
+    "weekday_mode": 3,
+    "hour_mode": 14,
+    "scene_top": [
+      {
+        "value": 5,
+        "count": 458,
+        "share": 0.3128415300546448
+      },
+      {
+        "value": 2,
+        "count": 375,
+        "share": 0.25614754098360654
+      },
+      {
+        "value": 6,
+        "count": 149,
+        "share": 0.10177595628415301
+      }
+    ],
+    "type_top": [
+      {
+        "value": 1,
+        "count": 818,
+        "share": 0.5587431693989071
+      },
+      {
+        "value": 0,
+        "count": 629,
+        "share": 0.4296448087431694
+      },
+      {
+        "value": 2,
+        "count": 17,
+        "share": 0.011612021857923498
+      }
+    ]
+  },
+  "long_highload": {
+    "threshold_p90": 2101.4027256944446,
+    "high_cells": 6518,
+    "stable_high_cells": 5874,
+    "total_cells": 65174,
+    "scene_top": [
+      {
+        "value": 2,
+        "count": 2678,
+        "share": 0.4108622276772016
+      },
+      {
+        "value": 5,
+        "count": 826,
+        "share": 0.12672598956735195
+      },
+      {
+        "value": 6,
+        "count": 815,
+        "share": 0.12503835532371893
+      }
+    ],
+    "type_top": [
+      {
+        "value": 1,
+        "count": 4223,
+        "share": 0.6478981282602025
+      },
+      {
+        "value": 0,
+        "count": 2141,
+        "share": 0.32847499232893523
+      },
+      {
+        "value": 2,
+        "count": 154,
+        "share": 0.023626879410862226
+      }
+    ]
+  },
+  "abnormal_user": {
+    "user_p99": 1445.9649166666663,
+    "flow_p99": 4231.852999999998,
+    "user_p10": 35.183336588541664,
+    "flow_per_user_p10": 1.48411443,
+    "high_user_low_fpu": 261,
+    "high_flow_low_user": 0,
+    "high_user_high_flow": 148
+  },
+  "time_series": {
+    "weekday_flow": 1500395786.3863637,
+    "weekend_flow": 1484844234.96875,
+    "weekday_user": 422915783.96732956,
+    "weekend_user": 415546569.7402344,
+    "holiday_flow": 1253371136.2,
+    "normal_flow": 1544824219.97,
+    "holiday_user": 340925468.865625,
+    "normal_user": 436955698.435,
+    "flow_user_corr": 0.9109691638585201,
+    "change_p90": 94809400.40000004,
+    "max_day": {
+      "date": "2021-04-09",
+      "flow_sum": 1797291580.0
+    },
+    "min_day": {
+      "date": "2021-02-15",
+      "flow_sum": 1073917202.0
+    }
+  },
+  "anomaly_methods": {
+    "std_threshold": 2788.4732285770087,
+    "std_anom_cells": 3037,
+    "p95_threshold": 2715.8740798611107,
+    "p99_threshold": 4231.852999999998,
+    "p95_anom_cells": 3259,
+    "p99_anom_cells": 652,
+    "isoforest_anom_cells": 652,
+    "kmeans_anom_cells": 652,
+    "kmeans_dist_threshold": 5.794398424075527
+  }
+}

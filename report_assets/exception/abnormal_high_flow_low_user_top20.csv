@@ -1,0 +1,1 @@
+CELL_ID,flow_sum,user_sum,flow_sumsq,user_sumsq,flow_count,user_count,flow_max,user_max,silent_count,record_count,activity_sum,activity_count,par_sum,par_count,LATITUDE,LONGITUDE,TYPE,SCENE,flow_mean,user_mean,flow_var,user_var,flow_std,user_std,flow_cv,user_cv,flow_per_user,peak_ratio,silent_ratio,activity_mean,par_mean
