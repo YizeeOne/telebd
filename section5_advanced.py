@@ -12,7 +12,7 @@ import seaborn as sns
 
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score, silhouette_score
 
 
 DATA_PATH = Path("all_final_data_with_attributes.csv")
@@ -157,24 +157,46 @@ def main() -> None:
     flow_hour_mean = safe_mean(flow_hour_sum, flow_hour_cnt)
     user_hour_mean = safe_mean(user_hour_sum, user_hour_cnt)
 
-    profile_sum = np.nansum(flow_hour_mean, axis=1, keepdims=True)
-    profile_share = flow_hour_mean / profile_sum
-    valid_mask = np.isfinite(profile_share).all(axis=1)
-    profile_share = profile_share[valid_mask]
+    flow_profile_sum = np.nansum(flow_hour_mean, axis=1, keepdims=True)
+    user_profile_sum = np.nansum(user_hour_mean, axis=1, keepdims=True)
+    flow_profile_share = flow_hour_mean / flow_profile_sum
+    user_profile_share = user_hour_mean / user_profile_sum
+    valid_mask = np.isfinite(flow_profile_share).all(axis=1) & np.isfinite(
+        user_profile_share
+    ).all(axis=1)
+    flow_profile_share = flow_profile_share[valid_mask]
+    user_profile_share = user_profile_share[valid_mask]
     valid_cells = np.array(top_cells)[valid_mask]
 
-    profile_df = pd.DataFrame(profile_share, columns=[f"h{h}" for h in range(24)])
+    profile_df = pd.DataFrame(
+        np.hstack([flow_profile_share, user_profile_share]),
+        columns=[f"flow_h{h}" for h in range(24)] + [f"user_h{h}" for h in range(24)],
+    )
     cell_meta = cell_agg[cell_agg["CELL_ID"].isin(valid_cells)].copy()
     cell_meta = cell_meta.set_index("CELL_ID").loc[valid_cells].reset_index()
+
+    extra_cols = [
+        "flow_mean",
+        "user_mean",
+        "flow_per_user",
+        "activity_mean",
+    ]
+    extra_df = cell_meta[extra_cols].copy()
+    extra_df = (extra_df - extra_df.mean()) / extra_df.std()
+    profile_df = pd.concat([profile_df.reset_index(drop=True), extra_df], axis=1)
 
     ks = list(range(2, 9))
     inertias = []
     silhouettes = []
+    ch_scores = []
+    db_scores = []
     for k in ks:
         kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
         labels = kmeans.fit_predict(profile_df)
         inertias.append(kmeans.inertia_)
         silhouettes.append(silhouette_score(profile_df, labels))
+        ch_scores.append(calinski_harabasz_score(profile_df, labels))
+        db_scores.append(davies_bouldin_score(profile_df, labels))
 
     best_k = ks[int(np.argmax(silhouettes))]
     final_kmeans = KMeans(n_clusters=best_k, random_state=42, n_init=10)
@@ -195,8 +217,23 @@ def main() -> None:
     plt.ylabel("Silhouette Score")
     save_fig("fig02_silhouette_scores.png")
 
+    plt.figure(figsize=(6, 4))
+    plt.plot(ks, ch_scores, marker="o", color="#4C78A8")
+    plt.title("Calinski-Harabasz \u66f2\u7ebf")
+    plt.xlabel("K")
+    plt.ylabel("CH Score")
+    save_fig("fig02b_ch_scores.png")
+
+    plt.figure(figsize=(6, 4))
+    plt.plot(ks, db_scores, marker="o", color="#72B7B2")
+    plt.title("Davies-Bouldin \u66f2\u7ebf")
+    plt.xlabel("K")
+    plt.ylabel("DB Score")
+    save_fig("fig02c_db_scores.png")
+
     cluster_profiles = (
-        pd.DataFrame(profile_df.assign(cluster=labels))
+        pd.DataFrame(flow_profile_share, columns=[f"h{h}" for h in range(24)])
+        .assign(cluster=labels)
         .groupby("cluster")
         .mean()
         * 100
@@ -260,7 +297,6 @@ def main() -> None:
         "flow_cv",
         "peak_ratio",
         "activity_mean",
-        "par_mean",
     ]
     radar_data = cell_meta[radar_cols].copy()
     radar_data = (radar_data - radar_data.mean()) / radar_data.std()
@@ -274,7 +310,6 @@ def main() -> None:
         "\u6d41\u91cfCV",
         "\u5cf0\u5747\u6bd4",
         "\u6d3b\u8dc3\u5ea6",
-        "PAR",
     ]
     build_radar(radar_names, radar_values, radar_labels)
     save_fig("fig08_cluster_radar.png")
@@ -293,7 +328,6 @@ def main() -> None:
         "flow_cv",
         "peak_ratio",
         "activity_mean",
-        "par_mean",
         "silent_ratio",
     ]
     corr_df = cell_agg[corr_cols].corr()
@@ -322,8 +356,8 @@ def main() -> None:
     target_df = pd.concat(target_records, ignore_index=True)
     target_df["DATETIME_KEY"] = pd.to_datetime(target_df["DATETIME_KEY"], errors="coerce")
     target_df = target_df.dropna(subset=["DATETIME_KEY"]).set_index("DATETIME_KEY")
-    hourly = target_df.resample("H")[["FLOW_SUM", "USER_COUNT"]].sum()
-    hourly = hourly.asfreq("H", fill_value=0)
+    hourly = target_df.resample("h")[["FLOW_SUM", "USER_COUNT"]].sum()
+    hourly = hourly.asfreq("h", fill_value=0)
 
     test_hours = TEST_DAYS * 24
     if len(hourly) <= test_hours:
@@ -408,6 +442,54 @@ def main() -> None:
     plt.ylabel("\u9884\u6d4b\u503c")
     save_fig("fig19_actual_vs_pred_scatter_user.png")
 
+    high_load_threshold = cell_agg["flow_sum"].quantile(0.99)
+    silent_threshold = 0.5
+    high_load_cells = cell_agg[cell_agg["flow_sum"] >= high_load_threshold]
+    silent_cells = cell_agg[cell_agg["silent_ratio"] >= silent_threshold]
+
+    def plot_scene_type(df: pd.DataFrame, label: str, file_prefix: str) -> None:
+        scene_counts = df["SCENE"].value_counts().head(10)
+        plt.figure(figsize=(8, 4))
+        sns.barplot(x=scene_counts.index.astype(int).astype(str), y=scene_counts.values, color="#4C78A8")
+        plt.title(f"{label}\u573a\u666f\u5206\u5e03")
+        plt.xlabel("\u573a\u666f\uff08SCENE\uff09")
+        plt.ylabel("\u5c0f\u533a\u6570\u91cf")
+        save_fig(f"fig20_{file_prefix}_scene_bar.png")
+
+        type_counts = df["TYPE"].value_counts().sort_index()
+        plt.figure(figsize=(6, 4))
+        sns.barplot(x=type_counts.index.astype(int).astype(str), y=type_counts.values, color="#F58518")
+        plt.title(f"{label}TYPE \u5206\u5e03")
+        plt.xlabel("TYPE")
+        plt.ylabel("\u5c0f\u533a\u6570\u91cf")
+        save_fig(f"fig21_{file_prefix}_type_bar.png")
+
+    if not high_load_cells.empty:
+        plot_scene_type(high_load_cells, "高负荷", "highload")
+        top_highload = high_load_cells.sort_values("flow_sum", ascending=False).head(20)
+        plt.figure(figsize=(10, 4))
+        labels = top_highload["CELL_ID"].astype(str)
+        sns.barplot(x=labels, y=top_highload["flow_sum"], color="#E45756")
+        plt.title("TOP20 高负荷小区总流量")
+        plt.xlabel("小区ID")
+        plt.ylabel("总流量（MB）")
+        plt.xticks(rotation=30, ha="right")
+        save_fig("fig22_highload_top20.png")
+        top_highload.to_csv(OUT_DIR / "highload_top20.csv", index=False)
+
+    if not silent_cells.empty:
+        plot_scene_type(silent_cells, "静默", "silent")
+        top_silent = silent_cells.sort_values("silent_ratio", ascending=False).head(20)
+        plt.figure(figsize=(10, 4))
+        labels = top_silent["CELL_ID"].astype(str)
+        sns.barplot(x=labels, y=top_silent["silent_ratio"], color="#72B7B2")
+        plt.title("TOP20 静默小区比例")
+        plt.xlabel("小区ID")
+        plt.ylabel("静默比例")
+        plt.xticks(rotation=30, ha="right")
+        save_fig("fig23_silent_top20.png")
+        top_silent.to_csv(OUT_DIR / "silent_top20.csv", index=False)
+
     stats_out = {
         "clustering": {
             "k": int(best_k),
@@ -417,6 +499,8 @@ def main() -> None:
                 int(cid): int(cluster_profiles.loc[cid].values.argmax())
                 for cid in cluster_profiles.index
             },
+            "ch_scores": dict(zip(ks, ch_scores)),
+            "db_scores": dict(zip(ks, db_scores)),
         },
         "forecast": {
             "target_cell": int(target_cell),
@@ -425,6 +509,14 @@ def main() -> None:
             "flow_mape": float(flow_mape),
             "user_mae": float(user_mae),
             "user_mape": float(user_mape),
+        },
+        "highload": {
+            "threshold": float(high_load_threshold),
+            "count": int(high_load_cells.shape[0]),
+        },
+        "silent": {
+            "threshold": float(silent_threshold),
+            "count": int(silent_cells.shape[0]),
         },
     }
 
