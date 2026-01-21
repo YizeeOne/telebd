@@ -108,6 +108,20 @@ def build_radar(categories: list[str], values: np.ndarray, labels: list[str]) ->
     ax.legend(loc="upper right", bbox_to_anchor=(1.2, 1.1))
 
 
+def cramers_v(table: pd.DataFrame) -> tuple[float, float]:
+    values = table.to_numpy()
+    n = values.sum()
+    if n == 0 or table.shape[0] < 2 or table.shape[1] < 2:
+        return float("nan"), float("nan")
+    row_sums = values.sum(axis=1, keepdims=True)
+    col_sums = values.sum(axis=0, keepdims=True)
+    expected = row_sums @ col_sums / n
+    chi2 = np.nansum((values - expected) ** 2 / np.where(expected == 0, np.nan, expected))
+    k = min(table.shape[0] - 1, table.shape[1] - 1)
+    v = float(np.sqrt(chi2 / (n * k))) if k > 0 else float("nan")
+    return float(chi2), v
+
+
 def main() -> None:
     ensure_out_dir()
     set_cn_style()
@@ -234,6 +248,16 @@ def main() -> None:
     final_kmeans = KMeans(n_clusters=best_k, random_state=42, n_init=10)
     labels = final_kmeans.fit_predict(profile_df)
     cell_meta["cluster"] = labels
+    flow_hour_valid = flow_hour_mean[valid_mask]
+    peak_hours = np.nanargmax(flow_hour_valid, axis=1)
+    cell_meta["peak_hour"] = peak_hours
+
+    day_hours = np.array([8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+    night_hours = np.array([0, 1, 2, 3, 4, 5, 6, 7, 20, 21, 22, 23])
+    day_flow = np.nansum(flow_hour_valid[:, day_hours], axis=1)
+    night_flow = np.nansum(flow_hour_valid[:, night_hours], axis=1)
+    day_night_ratio = day_flow / np.where(night_flow == 0, np.nan, night_flow)
+    cell_meta["day_night_ratio"] = day_night_ratio
 
     plt.figure(figsize=(6, 4))
     plt.plot(ks, inertias, marker="o")
@@ -289,6 +313,7 @@ def main() -> None:
     save_fig("fig04_cluster_sizes.png")
 
     scene_ct = pd.crosstab(cell_meta["cluster"], cell_meta["SCENE"])
+    scene_ct_full = scene_ct.copy()
     top_scenes = scene_ct.sum(axis=0).sort_values(ascending=False).head(10).index
     scene_ct = scene_ct[top_scenes]
     plt.figure(figsize=(10, 4))
@@ -298,7 +323,46 @@ def main() -> None:
     plt.ylabel("Cluster")
     save_fig("fig05_cluster_scene_heatmap.png")
 
+    scene_share = scene_ct.div(scene_ct.sum(axis=1), axis=0) * 100
+    plt.figure(figsize=(10, 4))
+    sns.heatmap(scene_share, cmap="YlGnBu", fmt=".1f")
+    plt.title("\u805a\u7c7b\u00d7\u573a\u666f\u5360\u6bd4\u70ed\u529b\u56fe\uff08%\uff09")
+    plt.xlabel("\u573a\u666f\uff08SCENE\uff09")
+    plt.ylabel("Cluster")
+    save_fig("fig30_cluster_scene_share_heatmap.png")
+
+    cluster_ids = scene_ct.index.tolist()
+    x = np.arange(len(top_scenes))
+    width = 0.35
+    plt.figure(figsize=(10, 4))
+    for idx, cluster_id in enumerate(cluster_ids):
+        values = scene_ct.loc[cluster_id].values
+        plt.bar(x + (idx - 0.5) * width, values, width, label=f"C{cluster_id}")
+    plt.xticks(x, top_scenes.astype(int).astype(str), rotation=30)
+    plt.title("\u4e0d\u540c\u805a\u7c7b\u7684\u573a\u666f\u6570\u91cf\u5bf9\u6bd4")
+    plt.xlabel("\u573a\u666f\uff08SCENE\uff09")
+    plt.ylabel("\u5c0f\u533a\u6570\u91cf")
+    plt.legend()
+    save_fig("fig31_cluster_scene_grouped_bar.png")
+
+    total = scene_ct_full.to_numpy().sum()
+    row_sums = scene_ct_full.sum(axis=1).to_numpy()[:, None]
+    col_sums = scene_ct_full.sum(axis=0).to_numpy()[None, :]
+    expected = row_sums @ col_sums / max(total, 1)
+    residual = (scene_ct_full.to_numpy() - expected) / np.sqrt(
+        np.where(expected == 0, np.nan, expected)
+    )
+    residual_df = pd.DataFrame(residual, index=scene_ct_full.index, columns=scene_ct_full.columns)
+    residual_df = residual_df[top_scenes]
+    plt.figure(figsize=(10, 4))
+    sns.heatmap(residual_df, cmap="coolwarm", center=0)
+    plt.title("\u805a\u7c7b\u00d7\u573a\u666f\u6807\u51c6\u5316\u6b8b\u5dee")
+    plt.xlabel("\u573a\u666f\uff08SCENE\uff09")
+    plt.ylabel("Cluster")
+    save_fig("fig32_cluster_scene_residual.png")
+
     type_ct = pd.crosstab(cell_meta["cluster"], cell_meta["TYPE"])
+    type_ct_full = type_ct.copy()
     plt.figure(figsize=(8, 4))
     type_ct.plot(kind="bar", stacked=True, colormap="Set2", ax=plt.gca())
     plt.title("\u805a\u7c7b\u4e0e TYPE \u5206\u5e03")
@@ -306,6 +370,125 @@ def main() -> None:
     plt.ylabel("\u5c0f\u533a\u6570\u91cf")
     plt.legend(title="TYPE", bbox_to_anchor=(1.02, 1), loc="upper left")
     save_fig("fig06_cluster_type_bar.png")
+
+    type_share = type_ct.div(type_ct.sum(axis=1), axis=0) * 100
+    plt.figure(figsize=(8, 4))
+    type_share.plot(kind="bar", stacked=True, colormap="Set2", ax=plt.gca())
+    plt.title("\u805a\u7c7b\u00d7TYPE \u5360\u6bd4\u5206\u5e03\uff08%\uff09")
+    plt.xlabel("Cluster")
+    plt.ylabel("\u5360\u6bd4\uff08%\uff09")
+    plt.legend(title="TYPE", bbox_to_anchor=(1.02, 1), loc="upper left")
+    save_fig("fig33_cluster_type_share_bar.png")
+
+    chi2_scene, cramers_scene = cramers_v(scene_ct_full)
+    chi2_type, cramers_type = cramers_v(type_ct_full)
+
+    scene_share_top = scene_ct.div(scene_ct.sum(axis=1), axis=0) * 100
+    plt.figure(figsize=(10, 4))
+    scene_share_top.plot(kind="bar", stacked=True, colormap="tab20", ax=plt.gca())
+    plt.title("\u805a\u7c7b\u00d7\u573a\u666f\u5360\u6bd4\u7ec4\u5408\uff08Top\u573a\u666f\uff09")
+    plt.xlabel("Cluster")
+    plt.ylabel("\u5360\u6bd4\uff08%\uff09")
+    plt.legend(title="SCENE", bbox_to_anchor=(1.02, 1), loc="upper left")
+    save_fig("fig34_cluster_scene_share_bar.png")
+
+    type_total = type_ct_full.to_numpy().sum()
+    type_row = type_ct_full.sum(axis=1).to_numpy()[:, None]
+    type_col = type_ct_full.sum(axis=0).to_numpy()[None, :]
+    type_expected = type_row @ type_col / max(type_total, 1)
+    type_residual = (type_ct_full.to_numpy() - type_expected) / np.sqrt(
+        np.where(type_expected == 0, np.nan, type_expected)
+    )
+    type_residual_df = pd.DataFrame(
+        type_residual, index=type_ct_full.index, columns=type_ct_full.columns
+    )
+    plt.figure(figsize=(6, 4))
+    sns.heatmap(type_residual_df, cmap="coolwarm", center=0)
+    plt.title("\u805a\u7c7b\u00d7TYPE \u6807\u51c6\u5316\u6b8b\u5dee")
+    plt.xlabel("TYPE")
+    plt.ylabel("Cluster")
+    save_fig("fig35_cluster_type_residual.png")
+
+    if scene_share_top.shape[0] == 2:
+        diff = scene_share_top.iloc[1] - scene_share_top.iloc[0]
+        colors = ["#E45756" if v < 0 else "#54A24B" for v in diff.values]
+        plt.figure(figsize=(10, 4))
+        plt.bar(scene_share_top.columns.astype(int).astype(str), diff.values, color=colors)
+        plt.axhline(0, color="#333333", linewidth=1)
+        plt.title("\u805a\u7c7b\u95f4\u573a\u666f\u5360\u6bd4\u5dee\u5f02\uff08C1-C0\uff09")
+        plt.xlabel("\u573a\u666f\uff08SCENE\uff09")
+        plt.ylabel("\u5360\u6bd4\u5dee\u503c\uff08%\uff09")
+        save_fig("fig36_cluster_scene_share_diff.png")
+
+    metric_items = [
+        ("flow_mean", "\u5e73\u5747\u6d41\u91cf"),
+        ("user_mean", "\u5e73\u5747\u7528\u6237\u6570"),
+        ("flow_per_user", "\u4eba\u5747\u6d41\u91cf"),
+        ("flow_cv", "\u6d41\u91cfCV"),
+        ("peak_ratio", "\u5cf0\u5747\u6bd4"),
+        ("activity_mean", "\u6d3b\u8dc3\u5ea6"),
+    ]
+    fig, axes = plt.subplots(2, 3, figsize=(12, 6))
+    for ax, (col, title) in zip(axes.flat, metric_items):
+        sns.boxplot(data=cell_meta, x="cluster", y=col, ax=ax, showfliers=False)
+        ax.set_title(title)
+        ax.set_xlabel("Cluster")
+        ax.set_ylabel("")
+    save_fig("fig37_cluster_metric_box.png")
+
+    flow_user_df = cell_meta[["flow_mean", "user_mean", "cluster"]].dropna()
+    flow_user_sample = flow_user_df.sample(min(6000, len(flow_user_df)), random_state=42)
+    plt.figure(figsize=(6, 5))
+    for cluster_id, subset in flow_user_sample.groupby("cluster"):
+        plt.scatter(
+            np.log1p(subset["flow_mean"]),
+            np.log1p(subset["user_mean"]),
+            s=8,
+            alpha=0.4,
+            label=f"Cluster {cluster_id}",
+        )
+    plt.title("\u805a\u7c7b\u6d41\u91cf-\u7528\u6237\u6570\u5173\u7cfb\uff08log1p\uff09")
+    plt.xlabel("log(1+\u5e73\u5747\u6d41\u91cf)")
+    plt.ylabel("log(1+\u5e73\u5747\u7528\u6237\u6570)")
+    plt.legend()
+    save_fig("fig38_cluster_flow_user_scatter.png")
+
+    cv_peak_df = cell_meta[["flow_cv", "peak_ratio", "cluster"]].dropna()
+    cv_peak_sample = cv_peak_df.sample(min(6000, len(cv_peak_df)), random_state=42)
+    plt.figure(figsize=(6, 5))
+    for cluster_id, subset in cv_peak_sample.groupby("cluster"):
+        plt.scatter(
+            subset["flow_cv"],
+            subset["peak_ratio"],
+            s=8,
+            alpha=0.4,
+            label=f"Cluster {cluster_id}",
+        )
+    plt.title("\u805a\u7c7b\u6d41\u91cf\u6ce2\u52a8-\u5cf0\u5747\u6bd4\u5173\u7cfb")
+    plt.xlabel("\u6d41\u91cfCV")
+    plt.ylabel("\u5cf0\u5747\u6bd4")
+    plt.legend()
+    save_fig("fig39_cluster_flowcv_peakratio_scatter.png")
+
+    peak_ct = pd.crosstab(cell_meta["cluster"], cell_meta["peak_hour"])
+    peak_share = peak_ct.div(peak_ct.sum(axis=1), axis=0) * 100
+    plt.figure(figsize=(10, 4))
+    sns.heatmap(peak_share, cmap="YlGnBu")
+    plt.title("\u805a\u7c7b\u00d7\u5cf0\u503c\u65f6\u6bb5\u5360\u6bd4\uff08%\uff09")
+    plt.xlabel("\u5c0f\u65f6")
+    plt.ylabel("Cluster")
+    save_fig("fig40_cluster_peak_hour_heatmap.png")
+
+    ratio_df = cell_meta[["cluster", "day_night_ratio"]].replace([np.inf, -np.inf], np.nan)
+    ratio_df = ratio_df.dropna()
+    ratio_df = ratio_df[ratio_df["day_night_ratio"] > 0]
+    plt.figure(figsize=(6, 4))
+    sns.boxplot(data=ratio_df, x="cluster", y="day_night_ratio", showfliers=False)
+    plt.yscale("log")
+    plt.title("\u805a\u7c7b\u65e5/\u591c\u6d41\u91cf\u6bd4\u5206\u5e03")
+    plt.xlabel("Cluster")
+    plt.ylabel("\u65e5/\u591c\u6d41\u91cf\u6bd4\uff08log\uff09")
+    save_fig("fig41_cluster_day_night_ratio.png")
 
     plt.figure(figsize=(6, 6))
     scatter_df = cell_meta.sample(min(3000, len(cell_meta)), random_state=42)
@@ -462,7 +645,6 @@ def main() -> None:
         plt.ylabel("\u6307\u6807")
         save_fig("fig25_flow_mean_pred_features.png")
 
-    peak_hours = np.nanargmax(flow_hour_mean[valid_mask], axis=1)
     plt.figure(figsize=(8, 4))
     sns.countplot(x=peak_hours, color="#72B7B2")
     plt.title("\u5c0f\u533a\u5cf0\u503c\u65f6\u6bb5\u5206\u5e03")
@@ -653,6 +835,10 @@ def main() -> None:
             },
             "ch_scores": dict(zip(ks, ch_scores)),
             "db_scores": dict(zip(ks, db_scores)),
+            "scene_chi2": chi2_scene,
+            "scene_cramers_v": cramers_scene,
+            "type_chi2": chi2_type,
+            "type_cramers_v": cramers_type,
         },
         "forecast": {
             "target_cell": int(target_cell),
