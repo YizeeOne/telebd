@@ -314,6 +314,8 @@ def main() -> None:
     weekday_user_excl = (
         daily_excl_chuxi.groupby("weekday")["user_sum"].mean().reindex(range(7))
     )
+    weekday_flow_all = daily_df.groupby("weekday")["flow_sum"].mean().reindex(range(7))
+    weekday_user_all = daily_df.groupby("weekday")["user_sum"].mean().reindex(range(7))
     weekday_labels_full = [
         "\u5468\u4e00",
         "\u5468\u4e8c",
@@ -327,19 +329,46 @@ def main() -> None:
     user_colors = ["#4C78A8"] * 7
     flow_colors[3] = "#E45756"
     user_colors[3] = "#E45756"
+    flow_excl_base = float(weekday_flow_excl.mean())
+    user_excl_base = float(weekday_user_excl.mean())
+    flow_all_base = float(weekday_flow_all.mean())
+    user_all_base = float(weekday_user_all.mean())
+    flow_excl_ratio = weekday_flow_excl / flow_excl_base if flow_excl_base else weekday_flow_excl
+    user_excl_ratio = weekday_user_excl / user_excl_base if user_excl_base else weekday_user_excl
+    flow_all_ratio = weekday_flow_all / flow_all_base if flow_all_base else weekday_flow_all
+    user_all_ratio = weekday_user_all / user_all_base if user_all_base else weekday_user_all
+
     plt.figure(figsize=(8, 4))
-    plt.bar(weekday_labels_full, weekday_flow_excl.values, color=flow_colors)
-    plt.title("\u5264\u9664\u9664\u5915\u540e\u5468\u5185\u65e5\u5747\u6d41\u91cf\uff08\u542b\u5468\u672b\uff09")
+    plt.bar(weekday_labels_full, flow_excl_ratio.values, color=flow_colors)
+    plt.axhline(1.0, color="#333333", linewidth=1)
+    plt.title("\u5264\u9664\u9664\u5915\u540e\u5468\u5185\u65e5\u5747\u6d41\u91cf\uff08\u76f8\u5bf9\u5747\u503c\uff0c\u542b\u5468\u672b\uff09")
     plt.xlabel("\u661f\u671f")
-    plt.ylabel("\u5e73\u5747\u6d41\u91cf\uff08MB\uff09")
+    plt.ylabel("\u76f8\u5bf9\u5747\u503c")
     save_fig("fig17_weekday_mean_flow_excl_chuxi.png")
 
     plt.figure(figsize=(8, 4))
-    plt.bar(weekday_labels_full, weekday_user_excl.values, color=user_colors)
-    plt.title("\u5264\u9664\u9664\u5915\u540e\u5468\u5185\u65e5\u5747\u7528\u6237\u6570\uff08\u542b\u5468\u672b\uff09")
+    plt.bar(weekday_labels_full, user_excl_ratio.values, color=user_colors)
+    plt.axhline(1.0, color="#333333", linewidth=1)
+    plt.title("\u5264\u9664\u9664\u5915\u540e\u5468\u5185\u65e5\u5747\u7528\u6237\u6570\uff08\u76f8\u5bf9\u5747\u503c\uff0c\u542b\u5468\u672b\uff09")
     plt.xlabel("\u661f\u671f")
-    plt.ylabel("\u5e73\u5747\u7528\u6237\u6570")
+    plt.ylabel("\u76f8\u5bf9\u5747\u503c")
     save_fig("fig18_weekday_mean_user_excl_chuxi.png")
+
+    plt.figure(figsize=(8, 4))
+    plt.bar(weekday_labels_full, flow_all_ratio.values, color=flow_colors)
+    plt.axhline(1.0, color="#333333", linewidth=1)
+    plt.title("\u672a\u5254\u9664\u9664\u5915\u7684\u5468\u5185\u65e5\u5747\u6d41\u91cf\uff08\u76f8\u5bf9\u5747\u503c\uff0c\u542b\u5468\u672b\uff09")
+    plt.xlabel("\u661f\u671f")
+    plt.ylabel("\u76f8\u5bf9\u5747\u503c")
+    save_fig("fig19_weekday_mean_flow_with_chuxi.png")
+
+    plt.figure(figsize=(8, 4))
+    plt.bar(weekday_labels_full, user_all_ratio.values, color=user_colors)
+    plt.axhline(1.0, color="#333333", linewidth=1)
+    plt.title("\u672a\u5254\u9664\u9664\u5915\u7684\u5468\u5185\u65e5\u5747\u7528\u6237\u6570\uff08\u76f8\u5bf9\u5747\u503c\uff0c\u542b\u5468\u672b\uff09")
+    plt.xlabel("\u661f\u671f")
+    plt.ylabel("\u76f8\u5bf9\u5747\u503c")
+    save_fig("fig20_weekday_mean_user_with_chuxi.png")
 
     scene_records = []
     for scene_key, sums in scene_weekday_sum.items():
@@ -506,6 +535,8 @@ def main() -> None:
         "weekday_flow_per_user": series_to_float_dict(weekday_flow_per_user),
         "weekday_flow_mean_excl_chuxi": series_to_float_dict(weekday_flow_excl),
         "weekday_user_mean_excl_chuxi": series_to_float_dict(weekday_user_excl),
+        "weekday_flow_mean_all": series_to_float_dict(weekday_flow_all),
+        "weekday_user_mean_all": series_to_float_dict(weekday_user_all),
     }
     stats_out = sanitize_json_value(stats_out)
     with open(OUT_DIR / "section7_stats.json", "w", encoding="utf-8") as f:
