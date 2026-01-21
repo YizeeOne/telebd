@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib import colors as mcolors
 import seaborn as sns
 
 
@@ -360,15 +361,27 @@ def main() -> None:
     build_radar(["\u5e73\u5747\u6d41\u91cf", "\u5cf0\u503c\u7528\u6237", "\u4eba\u5747\u6d41\u91cf", "\u6d41\u91cf\u6ce2\u52a8"], radar_values, radar_labels)
     save_fig("fig07_target_cell_radar.png")
 
+    flow_max = None
+    flow_min = None
     if chuxi20_cells is not None and not chuxi20_cells.empty:
         chuxi20_cells["flow_mean"] = chuxi20_cells["flow_sum"] / chuxi20_cells["count"].replace(0, np.nan)
+        flow_max = float(np.nanmax(chuxi20_cells["flow_mean"]))
+        positives = chuxi20_cells["flow_mean"].to_numpy()
+        positives = positives[positives > 0]
+        if positives.size:
+            flow_min = float(np.nanmin(positives))
         plt.figure(figsize=(6, 5))
+        weights = chuxi20_cells["flow_mean"].clip(lower=1e-3)
+        vmin = flow_min if flow_min and flow_min > 0 else 1e-3
+        vmax = flow_max if flow_max and flow_max > vmin else vmin * 10
+        norm = mcolors.LogNorm(vmin=vmin, vmax=vmax)
         plt.hist2d(
             chuxi20_cells["LONGITUDE"],
             chuxi20_cells["LATITUDE"],
-            weights=chuxi20_cells["flow_mean"],
-            bins=60,
+            weights=weights,
+            bins=80,
             cmap="magma",
+            norm=norm,
         )
         plt.colorbar(label="\u6d41\u91cf\u5bc6\u5ea6")
         plt.title("\u9664\u5915\u591c 20:00 \u5730\u7406\u70ed\u529b\u5206\u5e03")
@@ -378,13 +391,25 @@ def main() -> None:
 
     if march20_cells is not None and not march20_cells.empty:
         march20_cells["flow_mean"] = march20_cells["flow_sum"] / march20_cells["count"].replace(0, np.nan)
+        march_max = float(np.nanmax(march20_cells["flow_mean"]))
+        positives = march20_cells["flow_mean"].to_numpy()
+        positives = positives[positives > 0]
+        if positives.size:
+            march_min = float(np.nanmin(positives))
+            flow_min = march_min if flow_min is None else min(flow_min, march_min)
+        flow_max = march_max if flow_max is None else max(flow_max, march_max)
         plt.figure(figsize=(6, 5))
+        weights = march20_cells["flow_mean"].clip(lower=1e-3)
+        vmin = flow_min if flow_min and flow_min > 0 else 1e-3
+        vmax = flow_max if flow_max and flow_max > vmin else vmin * 10
+        norm = mcolors.LogNorm(vmin=vmin, vmax=vmax)
         plt.hist2d(
             march20_cells["LONGITUDE"],
             march20_cells["LATITUDE"],
-            weights=march20_cells["flow_mean"],
-            bins=60,
+            weights=weights,
+            bins=80,
             cmap="magma",
+            norm=norm,
         )
         plt.colorbar(label="\u6d41\u91cf\u5bc6\u5ea6")
         plt.title("\u5de5\u4f5c\u65e5 20:00 \u5730\u7406\u70ed\u529b\u5206\u5e03\uff083\u6708\uff09")
@@ -393,34 +418,52 @@ def main() -> None:
         save_fig("fig09_geo_heatmap_weekday_20.png")
 
     if chuxi20_cells is not None and not chuxi20_cells.empty:
-        sizes = np.log1p(chuxi20_cells["flow_sum"].clip(lower=0)) * 6
+        scale = flow_max if flow_max and flow_max > 0 else float(
+            np.nanmax(chuxi20_cells["flow_mean"])
+        )
+        sizes = 20 + 180 * np.sqrt(chuxi20_cells["flow_mean"].clip(lower=0) / scale)
         plt.figure(figsize=(6, 5))
+        vmin = flow_min if flow_min is not None else 0.0
+        vmax = flow_max if flow_max is not None else float(
+            np.nanmax(chuxi20_cells["flow_mean"])
+        )
+        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
         sc = plt.scatter(
             chuxi20_cells["LONGITUDE"],
             chuxi20_cells["LATITUDE"],
             s=sizes,
-            c=chuxi20_cells["SCENE"],
-            cmap="tab20",
+            c=chuxi20_cells["flow_mean"],
+            cmap="YlGnBu",
+            norm=norm,
             alpha=0.6,
         )
-        plt.colorbar(sc, label="SCENE")
+        plt.colorbar(sc, label="\u5e73\u5747\u6d41\u91cf")
         plt.title("\u9664\u5915\u591c 20:00 \u6d41\u91cf\u6c14\u6ce1\u56fe")
         plt.xlabel("\u7ecf\u5ea6")
         plt.ylabel("\u7eac\u5ea6")
         save_fig("fig10_bubble_chuxi_20.png")
 
     if march20_cells is not None and not march20_cells.empty:
-        sizes = np.log1p(march20_cells["flow_mean"].clip(lower=0)) * 6
+        scale = flow_max if flow_max and flow_max > 0 else float(
+            np.nanmax(march20_cells["flow_mean"])
+        )
+        sizes = 20 + 180 * np.sqrt(march20_cells["flow_mean"].clip(lower=0) / scale)
         plt.figure(figsize=(6, 5))
+        vmin = flow_min if flow_min is not None else 0.0
+        vmax = flow_max if flow_max is not None else float(
+            np.nanmax(march20_cells["flow_mean"])
+        )
+        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
         sc = plt.scatter(
             march20_cells["LONGITUDE"],
             march20_cells["LATITUDE"],
             s=sizes,
-            c=march20_cells["SCENE"],
-            cmap="tab20",
+            c=march20_cells["flow_mean"],
+            cmap="YlGnBu",
+            norm=norm,
             alpha=0.6,
         )
-        plt.colorbar(sc, label="SCENE")
+        plt.colorbar(sc, label="\u5e73\u5747\u6d41\u91cf")
         plt.title("\u5de5\u4f5c\u65e5 20:00 \u6d41\u91cf\u6c14\u6ce1\u56fe\uff083\u6708\uff09")
         plt.xlabel("\u7ecf\u5ea6")
         plt.ylabel("\u7eac\u5ea6")
