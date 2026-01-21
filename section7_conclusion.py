@@ -307,6 +307,40 @@ def main() -> None:
     plt.ylabel("\u5e73\u5747\u7528\u6237\u6570")
     save_fig("fig14_thursday_exclusion_user.png")
 
+    daily_excl_chuxi = daily_df[daily_df["date"].dt.date != CHUXI]
+    weekday_flow_excl = (
+        daily_excl_chuxi.groupby("weekday")["flow_sum"].mean().reindex(range(7))
+    )
+    weekday_user_excl = (
+        daily_excl_chuxi.groupby("weekday")["user_sum"].mean().reindex(range(7))
+    )
+    weekday_labels_full = [
+        "\u5468\u4e00",
+        "\u5468\u4e8c",
+        "\u5468\u4e09",
+        "\u5468\u56db",
+        "\u5468\u4e94",
+        "\u5468\u516d",
+        "\u5468\u65e5",
+    ]
+    flow_colors = ["#4C78A8"] * 7
+    user_colors = ["#4C78A8"] * 7
+    flow_colors[3] = "#E45756"
+    user_colors[3] = "#E45756"
+    plt.figure(figsize=(8, 4))
+    plt.bar(weekday_labels_full, weekday_flow_excl.values, color=flow_colors)
+    plt.title("\u5264\u9664\u9664\u5915\u540e\u5468\u5185\u65e5\u5747\u6d41\u91cf\uff08\u542b\u5468\u672b\uff09")
+    plt.xlabel("\u661f\u671f")
+    plt.ylabel("\u5e73\u5747\u6d41\u91cf\uff08MB\uff09")
+    save_fig("fig17_weekday_mean_flow_excl_chuxi.png")
+
+    plt.figure(figsize=(8, 4))
+    plt.bar(weekday_labels_full, weekday_user_excl.values, color=user_colors)
+    plt.title("\u5264\u9664\u9664\u5915\u540e\u5468\u5185\u65e5\u5747\u7528\u6237\u6570\uff08\u542b\u5468\u672b\uff09")
+    plt.xlabel("\u661f\u671f")
+    plt.ylabel("\u5e73\u5747\u7528\u6237\u6570")
+    save_fig("fig18_weekday_mean_user_excl_chuxi.png")
+
     scene_records = []
     for scene_key, sums in scene_weekday_sum.items():
         counts = scene_weekday_cnt[scene_key]
@@ -470,6 +504,8 @@ def main() -> None:
             ["weekly_mean", "thursday_mean", "retention"]
         ].to_dict(orient="index"),
         "weekday_flow_per_user": series_to_float_dict(weekday_flow_per_user),
+        "weekday_flow_mean_excl_chuxi": series_to_float_dict(weekday_flow_excl),
+        "weekday_user_mean_excl_chuxi": series_to_float_dict(weekday_user_excl),
     }
     stats_out = sanitize_json_value(stats_out)
     with open(OUT_DIR / "section7_stats.json", "w", encoding="utf-8") as f:
