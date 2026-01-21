@@ -337,37 +337,41 @@ def main() -> None:
     user_excl_ratio = weekday_user_excl / user_excl_base if user_excl_base else weekday_user_excl
     flow_all_ratio = weekday_flow_all / flow_all_base if flow_all_base else weekday_flow_all
     user_all_ratio = weekday_user_all / user_all_base if user_all_base else weekday_user_all
+    flow_excl_rel = (flow_excl_ratio - 1) * 100
+    user_excl_rel = (user_excl_ratio - 1) * 100
+    flow_all_rel = (flow_all_ratio - 1) * 100
+    user_all_rel = (user_all_ratio - 1) * 100
 
     plt.figure(figsize=(8, 4))
-    plt.bar(weekday_labels_full, flow_excl_ratio.values, color=flow_colors)
-    plt.axhline(1.0, color="#333333", linewidth=1)
-    plt.title("\u5264\u9664\u9664\u5915\u540e\u5468\u5185\u65e5\u5747\u6d41\u91cf\uff08\u76f8\u5bf9\u5747\u503c\uff0c\u542b\u5468\u672b\uff09")
+    plt.bar(weekday_labels_full, flow_excl_rel.values, color=flow_colors)
+    plt.axhline(0.0, color="#333333", linewidth=1)
+    plt.title("\u5264\u9664\u9664\u5915\u540e\u5468\u5185\u65e5\u5747\u6d41\u91cf\uff08\u76f8\u5bf9\u5747\u503c\u504f\u79fb\uff0c\u542b\u5468\u672b\uff09")
     plt.xlabel("\u661f\u671f")
-    plt.ylabel("\u76f8\u5bf9\u5747\u503c")
+    plt.ylabel("\u76f8\u5bf9\u5747\u503c\u504f\u79fb\uff08%\uff09")
     save_fig("fig17_weekday_mean_flow_excl_chuxi.png")
 
     plt.figure(figsize=(8, 4))
-    plt.bar(weekday_labels_full, user_excl_ratio.values, color=user_colors)
-    plt.axhline(1.0, color="#333333", linewidth=1)
-    plt.title("\u5264\u9664\u9664\u5915\u540e\u5468\u5185\u65e5\u5747\u7528\u6237\u6570\uff08\u76f8\u5bf9\u5747\u503c\uff0c\u542b\u5468\u672b\uff09")
+    plt.bar(weekday_labels_full, user_excl_rel.values, color=user_colors)
+    plt.axhline(0.0, color="#333333", linewidth=1)
+    plt.title("\u5264\u9664\u9664\u5915\u540e\u5468\u5185\u65e5\u5747\u7528\u6237\u6570\uff08\u76f8\u5bf9\u5747\u503c\u504f\u79fb\uff0c\u542b\u5468\u672b\uff09")
     plt.xlabel("\u661f\u671f")
-    plt.ylabel("\u76f8\u5bf9\u5747\u503c")
+    plt.ylabel("\u76f8\u5bf9\u5747\u503c\u504f\u79fb\uff08%\uff09")
     save_fig("fig18_weekday_mean_user_excl_chuxi.png")
 
     plt.figure(figsize=(8, 4))
-    plt.bar(weekday_labels_full, flow_all_ratio.values, color=flow_colors)
-    plt.axhline(1.0, color="#333333", linewidth=1)
-    plt.title("\u672a\u5254\u9664\u9664\u5915\u7684\u5468\u5185\u65e5\u5747\u6d41\u91cf\uff08\u76f8\u5bf9\u5747\u503c\uff0c\u542b\u5468\u672b\uff09")
+    plt.bar(weekday_labels_full, flow_all_rel.values, color=flow_colors)
+    plt.axhline(0.0, color="#333333", linewidth=1)
+    plt.title("\u672a\u5254\u9664\u9664\u5915\u7684\u5468\u5185\u65e5\u5747\u6d41\u91cf\uff08\u76f8\u5bf9\u5747\u503c\u504f\u79fb\uff0c\u542b\u5468\u672b\uff09")
     plt.xlabel("\u661f\u671f")
-    plt.ylabel("\u76f8\u5bf9\u5747\u503c")
+    plt.ylabel("\u76f8\u5bf9\u5747\u503c\u504f\u79fb\uff08%\uff09")
     save_fig("fig19_weekday_mean_flow_with_chuxi.png")
 
     plt.figure(figsize=(8, 4))
-    plt.bar(weekday_labels_full, user_all_ratio.values, color=user_colors)
-    plt.axhline(1.0, color="#333333", linewidth=1)
-    plt.title("\u672a\u5254\u9664\u9664\u5915\u7684\u5468\u5185\u65e5\u5747\u7528\u6237\u6570\uff08\u76f8\u5bf9\u5747\u503c\uff0c\u542b\u5468\u672b\uff09")
+    plt.bar(weekday_labels_full, user_all_rel.values, color=user_colors)
+    plt.axhline(0.0, color="#333333", linewidth=1)
+    plt.title("\u672a\u5254\u9664\u9664\u5915\u7684\u5468\u5185\u65e5\u5747\u7528\u6237\u6570\uff08\u76f8\u5bf9\u5747\u503c\u504f\u79fb\uff0c\u542b\u5468\u672b\uff09")
     plt.xlabel("\u661f\u671f")
-    plt.ylabel("\u76f8\u5bf9\u5747\u503c")
+    plt.ylabel("\u76f8\u5bf9\u5747\u503c\u504f\u79fb\uff08%\uff09")
     save_fig("fig20_weekday_mean_user_with_chuxi.png")
 
     scene_records = []
