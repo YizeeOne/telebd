@@ -94,6 +94,26 @@ def build_radar(categories: list[str], values: np.ndarray, labels: list[str]) ->
     ax.legend(loc="upper right", bbox_to_anchor=(1.2, 1.1))
 
 
+def build_bubble_norm(frames: list[pd.DataFrame | None]) -> mcolors.Normalize:
+    values = []
+    for frame in frames:
+        if frame is None or frame.empty:
+            continue
+        vals = frame["flow_mean"].to_numpy()
+        vals = vals[np.isfinite(vals) & (vals > 0)]
+        if vals.size:
+            values.append(vals)
+    if not values:
+        return mcolors.Normalize(vmin=0.0, vmax=1.0)
+    all_vals = np.concatenate(values)
+    vmin = float(np.nanpercentile(all_vals, 10))
+    vmax = float(np.nanpercentile(all_vals, 98))
+    if not np.isfinite(vmin) or not np.isfinite(vmax) or vmax <= vmin:
+        vmin = float(np.nanmin(all_vals))
+        vmax = float(np.nanmax(all_vals))
+    return mcolors.PowerNorm(gamma=0.7, vmin=vmin, vmax=vmax)
+
+
 def main() -> None:
     ensure_out_dir()
     set_cn_style()
@@ -417,25 +437,22 @@ def main() -> None:
         plt.ylabel("\u7eac\u5ea6")
         save_fig("fig09_geo_heatmap_weekday_20.png")
 
+    bubble_norm = build_bubble_norm([chuxi20_cells, march20_cells])
+
     if chuxi20_cells is not None and not chuxi20_cells.empty:
         scale = flow_max if flow_max and flow_max > 0 else float(
-            np.nanmax(chuxi20_cells["flow_mean"])
+            np.manmax(chuxi20_cells["flow_mean"])
         )
         sizes = 20 + 180 * np.sqrt(chuxi20_cells["flow_mean"].clip(lower=0) / scale)
         plt.figure(figsize=(6, 5))
-        vmin = flow_min if flow_min is not None else 0.0
-        vmax = flow_max if flow_max is not None else float(
-            np.nanmax(chuxi20_cells["flow_mean"])
-        )
-        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
         sc = plt.scatter(
             chuxi20_cells["LONGITUDE"],
             chuxi20_cells["LATITUDE"],
             s=sizes,
             c=chuxi20_cells["flow_mean"],
-            cmap="YlGnBu",
-            norm=norm,
-            alpha=0.6,
+            cmap="Blues",
+            norm=bubble_norm,
+            alpha=0.55,
         )
         plt.colorbar(sc, label="\u5e73\u5747\u6d41\u91cf")
         plt.title("\u9664\u5915\u591c 20:00 \u6d41\u91cf\u6c14\u6ce1\u56fe")
@@ -449,19 +466,14 @@ def main() -> None:
         )
         sizes = 20 + 180 * np.sqrt(march20_cells["flow_mean"].clip(lower=0) / scale)
         plt.figure(figsize=(6, 5))
-        vmin = flow_min if flow_min is not None else 0.0
-        vmax = flow_max if flow_max is not None else float(
-            np.nanmax(march20_cells["flow_mean"])
-        )
-        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
         sc = plt.scatter(
             march20_cells["LONGITUDE"],
             march20_cells["LATITUDE"],
             s=sizes,
             c=march20_cells["flow_mean"],
-            cmap="YlGnBu",
-            norm=norm,
-            alpha=0.6,
+            cmap="Blues",
+            norm=bubble_norm,
+            alpha=0.55,
         )
         plt.colorbar(sc, label="\u5e73\u5747\u6d41\u91cf")
         plt.title("\u5de5\u4f5c\u65e5 20:00 \u6d41\u91cf\u6c14\u6ce1\u56fe\uff083\u6708\uff09")
